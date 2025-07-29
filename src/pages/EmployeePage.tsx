@@ -4,10 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, Edit, Trash2 } from "lucide-react"
+import { UserPlus, Edit, Trash2, KeyRound } from "lucide-react"
 import { useEmployees } from "@/hooks/useEmployees"
 import { Employee } from "@/types/employee"
 import { EmployeeDialog } from "@/components/EmployeeDialog"
+import { ResetPasswordDialog } from "@/components/ResetPasswordDialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
@@ -25,6 +26,7 @@ import {
 
 export default function EmployeePage() {
   const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false)
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const { user } = useAuth()
   const { toast } = useToast()
@@ -33,6 +35,11 @@ export default function EmployeePage() {
   const handleOpenDialog = (employee: Employee | null) => {
     setSelectedEmployee(employee)
     setIsEmployeeDialogOpen(true)
+  }
+
+  const handleOpenResetPasswordDialog = (employee: Employee) => {
+    setSelectedEmployee(employee)
+    setIsResetPasswordDialogOpen(true)
   }
 
   const handleDelete = (employeeToDelete: Employee) => {
@@ -51,6 +58,11 @@ export default function EmployeePage() {
       <EmployeeDialog
         open={isEmployeeDialogOpen}
         onOpenChange={setIsEmployeeDialogOpen}
+        employee={selectedEmployee}
+      />
+      <ResetPasswordDialog
+        open={isResetPasswordDialogOpen}
+        onOpenChange={setIsResetPasswordDialogOpen}
         employee={selectedEmployee}
       />
       <Card>
@@ -96,7 +108,10 @@ export default function EmployeePage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(employee)}>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenResetPasswordDialog(employee)} title="Reset Password">
+                          <KeyRound className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(employee)} title="Edit">
                           <Edit className="h-4 w-4" />
                         </Button>
                         {employee.id !== user?.id && (

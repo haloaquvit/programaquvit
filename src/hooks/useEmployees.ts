@@ -66,6 +66,15 @@ export const useEmployees = () => {
     },
   });
 
+  const resetPassword = useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string, newPassword: string }) => {
+      const { error } = await supabase.functions.invoke('reset-employee-password', {
+        body: { userId, newPassword },
+      });
+      if (error) throw new Error(error.message);
+    },
+  });
+
   const deleteEmployee = useMutation({
     mutationFn: async (userId: string) => {
       const { error } = await supabase.functions.invoke('delete-employee', {
@@ -84,6 +93,7 @@ export const useEmployees = () => {
     error,
     createEmployee,
     updateEmployee,
+    resetPassword,
     deleteEmployee,
   }
 }

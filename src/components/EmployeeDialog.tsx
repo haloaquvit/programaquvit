@@ -134,7 +134,7 @@ export function EmployeeDialog({ open, onOpenChange, employee }: EmployeeDialogP
             </div>
             {!isEditing && (
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Password Awal</Label>
                 <Input id="password" type="password" {...form.register("password")} />
                 {(form.formState.errors as any).password && <p className="text-sm text-destructive">{(form.formState.errors as any).password.message}</p>}
               </div>
