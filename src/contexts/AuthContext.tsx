@@ -52,8 +52,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .single();
     
     if (error) {
-      console.error("Error fetching user profile from view:", error);
-      setUser(null);
+      // Jika profil tidak ditemukan (error code PGRST116), coba buat profil baru.
+      // Ini untuk menangani kasus pengguna lama yang belum memiliki profil.
+      if (error.code === 'PGRST116') {
+        console.warn('User profile not found. Attempting to create one.');
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: supabaseUser.id,
+            email: supabaseUser.email,
+            full_name: supabaseUser.user_metadata?.full_name || 'Nama Belum Diatur',
+            role: supabaseUser.user_metadata?.role || 'karyawan',
+            status: 'Aktif'
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Failed to create fallback user profile:", insertError);
+          setUser(null);
+          // Langsung logout jika pembuatan profil gagal agar tidak terjadi loop
+          await supabase.auth.signOut();
+        } else if (newProfile) {
+          const employeeProfile: Employee = {
+            id: newProfile.id,
+            name: newProfile.full_name,
+            email: newProfile.email,
+            role: newProfile.role,
+            phone: newProfile.phone,
+            address: newProfile.address,
+            status: newProfile.status,
+          };
+          setUser(employeeProfile);
+        }
+      } else {
+        console.error("Error fetching user profile from view:", error);
+        setUser(null);
+      }
     } else if (data) {
       const employeeProfile: Employee = {
         id: data.id,
