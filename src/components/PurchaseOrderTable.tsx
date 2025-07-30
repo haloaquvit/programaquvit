@@ -14,6 +14,18 @@ import { usePurchaseOrders } from "@/hooks/usePurchaseOrders"
 import { useAuth } from "@/hooks/useAuth"
 import { Skeleton } from "./ui/skeleton"
 import { PayPoDialog } from "./PayPoDialog"
+import { Trash2 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const statusOptions: PurchaseOrderStatus[] = ['Pending', 'Approved', 'Rejected', 'Dibayar', 'Selesai'];
 
@@ -31,7 +43,7 @@ const getStatusVariant = (status: PurchaseOrderStatus) => {
 export function PurchaseOrderTable() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { purchaseOrders, isLoading, updatePoStatus, payPurchaseOrder, receivePurchaseOrder } = usePurchaseOrders();
+  const { purchaseOrders, isLoading, updatePoStatus, payPurchaseOrder, receivePurchaseOrder, deletePurchaseOrder } = usePurchaseOrders();
   const [isPayDialogOpen, setIsPayDialogOpen] = React.useState(false);
   const [selectedPo, setSelectedPo] = React.useState<PurchaseOrder | null>(null);
 
@@ -50,6 +62,13 @@ export function PurchaseOrderTable() {
   const handleReceiveGoods = (po: PurchaseOrder) => {
     receivePurchaseOrder.mutate(po, {
       onSuccess: () => toast({ title: "Sukses", description: "Stok berhasil diterima dan ditambahkan." }),
+      onError: (error) => toast({ variant: "destructive", title: "Gagal", description: error.message }),
+    });
+  };
+
+  const handleDeletePo = (poId: string) => {
+    deletePurchaseOrder.mutate(poId, {
+      onSuccess: () => toast({ title: "Sukses", description: "Purchase Order berhasil dihapus." }),
       onError: (error) => toast({ variant: "destructive", title: "Gagal", description: error.message }),
     });
   };
@@ -93,10 +112,41 @@ export function PurchaseOrderTable() {
       header: "Aksi",
       cell: ({ row }) => {
         const po = row.original;
-        if (po.status === 'Dibayar') {
-          return <Button size="sm" onClick={() => handleReceiveGoods(po)} disabled={receivePurchaseOrder.isPending}>Terima Barang</Button>
-        }
-        return null;
+        const isOwner = user?.role === 'owner';
+        return (
+          <div className="flex items-center gap-1">
+            {po.status === 'Dibayar' && (
+              <Button size="sm" onClick={() => handleReceiveGoods(po)} disabled={receivePurchaseOrder.isPending}>Terima Barang</Button>
+            )}
+            {isOwner && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" title="Hapus PO">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Tindakan ini akan menghapus Purchase Order #{po.id} secara permanen.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleDeletePo(po.id)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={deletePurchaseOrder.isPending}
+                    >
+                      Ya, Hapus
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+        );
       }
     }
   ]

@@ -31,6 +31,7 @@ export default function EmployeePage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const { employees, isLoading, deleteEmployee, isError, error } = useEmployees()
+  const isOwner = user?.role === 'owner';
 
   const handleOpenDialog = (employee: Employee | null) => {
     setSelectedEmployee(employee)
@@ -88,9 +89,11 @@ export default function EmployeePage() {
               <CardTitle>Manajemen Karyawan</CardTitle>
               <CardDescription>Kelola data semua karyawan di perusahaan Anda.</CardDescription>
             </div>
-            <Button onClick={() => handleOpenDialog(null)}>
-              <UserPlus className="mr-2 h-4 w-4" /> Tambah Karyawan Baru
-            </Button>
+            {isOwner && (
+              <Button onClick={() => handleOpenDialog(null)}>
+                <UserPlus className="mr-2 h-4 w-4" /> Tambah Karyawan Baru
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -124,37 +127,43 @@ export default function EmployeePage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenResetPasswordDialog(employee)} title="Reset Password">
-                          <KeyRound className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(employee)} title="Edit">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {employee.id !== user?.id && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tindakan ini akan menghapus karyawan "{employee.name}" secara permanen.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Batal</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(employee)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Ya, Hapus
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                        {isOwner ? (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenResetPasswordDialog(employee)} title="Reset Password">
+                              <KeyRound className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(employee)} title="Edit">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {employee.id !== user?.id && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" title="Hapus">
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tindakan ini akan menghapus karyawan "{employee.name}" secara permanen.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDelete(employee)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Ya, Hapus
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Hanya Owner</span>
                         )}
                       </TableCell>
                     </TableRow>

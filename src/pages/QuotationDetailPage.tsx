@@ -23,6 +23,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useTransactions } from "@/hooks/useTransactions"
+import { useAuth } from "@/hooks/useAuth"
+import { TransactionStatus, PaymentStatus } from "@/types/transaction"
 
 export default function QuotationDetailPage() {
   const { id: quotationId } = useParams<{ id: string }>()
@@ -30,6 +33,8 @@ export default function QuotationDetailPage() {
   const { toast } = useToast()
   const { quotation, isLoading } = useQuotationById(quotationId || "")
   const { updateQuotation } = useQuotations()
+  const { addTransaction } = useTransactions()
+  const { user } = useAuth()
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false)
 
   const handleConvertToTransaction = () => {
@@ -38,10 +43,38 @@ export default function QuotationDetailPage() {
   };
 
   const handleApproveQuotation = () => {
-    if (!quotationId) return;
+    if (!quotationId || !quotation || !user) return;
+
+    const newTransactionData = {
+      id: `T-${Date.now()}`,
+      customerId: quotation.customerId,
+      customerName: quotation.customerName,
+      cashierId: user.id,
+      cashierName: user.name,
+      orderDate: new Date(),
+      items: quotation.items,
+      total: quotation.total,
+      paidAmount: 0,
+      paymentStatus: 'Belum Lunas' as PaymentStatus,
+      status: 'Pesanan Masuk' as TransactionStatus,
+    };
+
     updateQuotation.mutate({ quotationId, newData: { status: 'Disetujui' } }, {
-      onSuccess: () => {
-        toast({ title: "Sukses", description: "Penawaran telah disetujui." })
+      onSuccess: (updatedQuotation) => {
+        toast({ title: "Sukses", description: "Penawaran disetujui. Membuat transaksi..." })
+        
+        addTransaction.mutate({ newTransaction: newTransactionData, quotationId: updatedQuotation.id }, {
+          onSuccess: (newTransaction) => {
+            toast({
+              title: "Transaksi Dibuat!",
+              description: `Transaksi ${newTransaction.id} berhasil dibuat.`,
+              action: <Button asChild size="sm"><Link to={`/transactions/${newTransaction.id}`}>Lihat</Link></Button>
+            })
+          },
+          onError: (error) => {
+            toast({ variant: "destructive", title: "Gagal Membuat Transaksi", description: error.message })
+          }
+        });
       },
       onError: (error) => {
         toast({ variant: "destructive", title: "Gagal", description: error.message })
@@ -108,19 +141,19 @@ export default function QuotationDetailPage() {
                 <CardContent>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="success"><ShieldCheck className="mr-2 h-4 w-4" /> Setujui Penawaran</Button>
+                      <Button variant="success" disabled={updateQuotation.isPending || addTransaction.isPending}><ShieldCheck className="mr-2 h-4 w-4" /> Setujui Penawaran</Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Anda yakin ingin menyetujui penawaran ini?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Setelah disetujui, Anda dapat mengubah penawaran ini menjadi transaksi. Tindakan ini tidak dapat dibatalkan.
+                          Setelah disetujui, transaksi akan dibuat secara otomatis. Tindakan ini tidak dapat dibatalkan.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleApproveQuotation} disabled={updateQuotation.isPending}>
-                          Ya, Setujui
+                        <AlertDialogAction onClick={handleApproveQuotation} disabled={updateQuotation.isPending || addTransaction.isPending}>
+                          Ya, Setujui & Buat Transaksi
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -135,14 +168,9 @@ export default function QuotationDetailPage() {
                   <CheckCircle className="h-8 w-8 text-green-500" />
                   <div>
                     <CardTitle className="text-green-700 dark:text-green-400">Penawaran Disetujui</CardTitle>
-                    <p className="text-sm text-green-600 dark:text-green-500">Pelanggan telah menyetujui penawaran ini. Lanjutkan untuk membuat transaksi.</p>
+                    <p className="text-sm text-green-600 dark:text-green-500">Sedang membuat transaksi dari penawaran ini...</p>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <Button onClick={handleConvertToTransaction}>
-                    <FileText className="mr-2 h-4 w-4" /> Buat Transaksi dari Penawaran
-                  </Button>
-                </CardContent>
               </Card>
             )}
             {quotation.transactionId && (

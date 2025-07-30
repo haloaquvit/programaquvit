@@ -121,6 +121,16 @@ export const usePurchaseOrders = () => {
     }
   });
 
+  const deletePurchaseOrder = useMutation({
+    mutationFn: async (poId: string) => {
+      const { error } = await supabase.from('purchase_orders').delete().eq('id', poId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+    },
+  });
+
   return {
     purchaseOrders,
     isLoading,
@@ -128,5 +138,6 @@ export const usePurchaseOrders = () => {
     updatePoStatus,
     payPurchaseOrder,
     receivePurchaseOrder,
+    deletePurchaseOrder,
   }
 }

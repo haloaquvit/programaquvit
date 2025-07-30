@@ -7,15 +7,24 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/useAuth';
+import PageLoader from '@/components/PageLoader';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { settings, isLoading } = useCompanySettings();
+  const { settings, isLoading: settingsLoading } = useCompanySettings();
+  const { session, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
-        navigate('/');
+    if (session && !authLoading) {
+      navigate('/', { replace: true });
+    }
+  }, [session, authLoading, navigate]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        navigate('/', { replace: true });
       }
     });
 
@@ -24,11 +33,15 @@ export default function LoginPage() {
     };
   }, [navigate]);
 
+  if (authLoading || session) {
+    return <PageLoader />;
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          {isLoading ? (
+          {settingsLoading ? (
             <Skeleton className="mx-auto h-16 w-32" />
           ) : settings?.logo ? (
             <img src={settings.logo} alt="Company Logo" className="mx-auto h-16 object-contain" />
