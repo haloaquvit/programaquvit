@@ -7,9 +7,9 @@ import { Toaster } from "@/components/ui/toaster";
 
 const queryClient = new QueryClient();
 
-if (location.hostname.includes("vercel.app")) {
-  location.href = "https://buatan.pro";
-}
+// if (location.hostname.includes("vercel.app")) {
+//   location.href = "https://buatan.pro";
+// }
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
