@@ -12,7 +12,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider = ({ children }: { ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -145,13 +145,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
-      if (session?.user) {
-        setIsLoading(true); // Set loading to true on auth state change
-        await fetchUserProfile(session.user);
-        setIsLoading(false); // Set loading to false after profile fetch
-      } else {
-        setUser(null);
-        setIsLoading(false); // Set loading to false if no user
+      setIsLoading(true); // Set loading to true when auth state changes and we need to process
+      try {
+        if (session?.user) {
+          await fetchUserProfile(session.user);
+        } else {
+          setUser(null);
+        }
+      } catch (e) {
+        console.error("Error during auth state change processing:", e);
+        setUser(null); // Ensure user is null on error
+      } finally {
+        setIsLoading(false); // Always set to false after processing
       }
     });
 
