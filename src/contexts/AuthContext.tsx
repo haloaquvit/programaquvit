@@ -25,9 +25,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .single();
     
     if (error) {
+      // If profile not found in employees_view (e.g., new user or view not updated yet)
+      // Try to fetch from 'profiles' table directly or create a fallback profile
+      if (error.code === 'PGRST116' || error.message.includes('0 rows')) { // PGRST116 is "No rows found"
+        console.warn('User profile not found in employees_view. Attempting to fetch/create in profiles table.');
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', supabaseUser.id)
+          .single();
+
+        if (profileError && profileError.code === 'PGRST116') {
+          // Profile still not found, create a basic one
+          console.log('Profile not found in profiles table, creating a new one.');
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: supabaseUser.id,
+              email: supabaseUser.email,
+              full_name: supabaseUser.user_metadata?.full_name || 'Nama Pengguna',
+              username: supabaseUser.user_metadata?.username || null,
+              role: supabaseUser.user_metadata?.role || 'karyawan',
+              status: 'Aktif'
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error("Failed to create fallback user profile:", insertError.message);
+            return null;
+          } else if (newProfile) {
+            console.log('Fallback profile created:', newProfile);
+            return {
+              id: newProfile.id,
+              name: newProfile.full_name,
+              username: newProfile.username,
+              email: newProfile.email,
+              role: newProfile.role,
+              phone: newProfile.phone,
+              address: newProfile.address,
+              status: newProfile.status,
+            };
+          }
+        } else if (profileData) {
+          // Profile found in profiles table, use it
+          console.log('Profile found in profiles table:', profileData);
+          return {
+            id: profileData.id,
+            name: profileData.full_name,
+            username: profileData.username,
+            email: profileData.email,
+            role: profileData.role,
+            phone: profileData.phone,
+            address: profileData.address,
+            status: profileData.status,
+          };
+        }
+      }
       console.error("Error fetching user profile:", error.message);
-      // Jika profil tidak ditemukan, logout paksa untuk menghindari state yang tidak valid
-      await supabase.auth.signOut();
       return null;
     }
     
@@ -58,6 +113,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           const profile = await fetchUserProfile(session.user);
           setUser(profile);
+        } else {
+          setUser(null); // Ensure user is null if no session
         }
         // 2. Selesaikan loading setelah semua data awal didapatkan
         setIsLoading(false);
@@ -67,7 +124,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initializeAuth();
 
     // 3. Siapkan listener untuk perubahan di masa depan (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } = {} } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
 
@@ -78,12 +135,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const profile = await fetchUserProfile(session.user);
           setUser(profile);
         }
+        // Ensure isLoading is false after any auth state change
+        setIsLoading(false); 
       }
     );
 
     return () => {
       isMounted = false;
-      subscription?.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, [fetchUserProfile]);
 
