@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { DateRange } from "react-day-picker"
-import { addDays, startOfMonth, endOfMonth, format } from "date-fns"
+import { addDays, startOfMonth, endOfMonth, format, startOfDay, endOfDay } from "date-fns"
 import { id } from "date-fns/locale/id"
 import { Download, TrendingUp, TrendingDown, Wallet, Scale, HandCoins } from "lucide-react"
 import jsPDF from "jspdf"
@@ -25,8 +25,8 @@ export function FinancialReport() {
   const { settings: companyInfo } = useCompanySettings();
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
+    from: startOfDay(new Date()),
+    to: endOfDay(new Date()),
   })
 
   const filteredData = useMemo(() => {
