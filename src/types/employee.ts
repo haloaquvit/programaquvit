@@ -4,6 +4,7 @@ export type UserRole = 'cashier' | 'designer' | 'operator' | 'admin' | 'supervis
 export interface Employee {
   id: string;
   name: string;
+  username: string | null;
   email: string;
   role: UserRole;
   phone: string;

@@ -16,6 +16,7 @@ import { PasswordInput } from "./PasswordInput"
 
 const baseSchema = {
   name: z.string().min(3, "Nama minimal 3 karakter.").transform(val => val.trim()),
+  username: z.string().min(3, "Username minimal 3 karakter").regex(/^[a-z0-9_]+$/, "Username hanya boleh berisi huruf kecil, angka, dan underscore.").transform(val => val.trim().toLowerCase()).nullable(),
   email: z.string().email("Email tidak valid.").transform(val => val.trim().toLowerCase()),
   phone: z.string().min(10, "Nomor telepon tidak valid.").transform(val => val.trim()),
   address: z.string().min(5, "Alamat minimal 5 karakter.").transform(val => val.trim()),
@@ -56,6 +57,7 @@ export function EmployeeDialog({ open, onOpenChange, employee }: EmployeeDialogP
       if (employee) {
         form.reset({
           name: employee.name,
+          username: employee.username,
           email: employee.email,
           phone: employee.phone,
           address: employee.address,
@@ -64,7 +66,7 @@ export function EmployeeDialog({ open, onOpenChange, employee }: EmployeeDialogP
         })
       } else {
         form.reset({
-          name: '', email: '', phone: '', address: '', role: 'cashier', status: 'Aktif', password: ''
+          name: '', username: '', email: '', phone: '', address: '', role: 'cashier', status: 'Aktif', password: ''
         })
       }
     }
@@ -89,6 +91,7 @@ export function EmployeeDialog({ open, onOpenChange, employee }: EmployeeDialogP
         email: createData.email,
         password: createData.password,
         full_name: createData.name,
+        username: createData.username,
         role: createData.role,
         phone: createData.phone,
         address: createData.address,
@@ -124,14 +127,19 @@ export function EmployeeDialog({ open, onOpenChange, employee }: EmployeeDialogP
               {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
             </div>
             <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input id="username" {...form.register("username")} />
+              {form.formState.errors.username && <p className="text-sm text-destructive">{form.formState.errors.username.message}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email (untuk login)</Label>
+              <Input id="email" type="email" {...form.register("email")} disabled={isEditing} />
+              {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="phone">No. Telepon</Label>
               <Input id="phone" {...form.register("phone")} />
               {form.formState.errors.phone && <p className="text-sm text-destructive">{form.formState.errors.phone.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" {...form.register("email")} disabled={isEditing} />
-              {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
             </div>
             {!isEditing && (
               <div className="space-y-2">

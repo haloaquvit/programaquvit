@@ -20,6 +20,7 @@ export const useEmployees = () => {
       return data.map((employee: any) => ({
         id: employee.id,
         name: employee.full_name,
+        username: employee.username,
         email: employee.email,
         role: employee.role,
         phone: employee.phone,
@@ -44,11 +45,12 @@ export const useEmployees = () => {
 
   const updateEmployee = useMutation({
     mutationFn: async (employeeData: Partial<Employee> & { id: string }): Promise<any> => {
-      const { id, name, role, phone, address, status } = employeeData;
+      const { id, name, username, role, phone, address, status } = employeeData;
       const { data, error } = await supabase
         .from('profiles')
         .update({
           full_name: name,
+          username,
           role,
           phone,
           address,

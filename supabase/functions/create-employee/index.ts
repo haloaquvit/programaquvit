@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, password, full_name, role, phone, address, status } = await req.json()
+    const { email, password, full_name, username, role, phone, address, status } = await req.json()
 
     if (!email || !password || !full_name || !role) {
       throw new Error("Email, password, full name, and role are required.")
@@ -31,6 +31,7 @@ serve(async (req) => {
       email_confirm: true, // Auto-confirm email
       user_metadata: {
         full_name,
+        username, // Pass username to user_metadata
         role,
         phone,    // Pass phone to user_metadata
         address,  // Pass address to user_metadata

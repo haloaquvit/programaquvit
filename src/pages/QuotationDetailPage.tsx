@@ -68,7 +68,7 @@ export default function QuotationDetailPage() {
             toast({
               title: "Transaksi Dibuat!",
               description: `Transaksi ${newTransaction.id} berhasil dibuat.`,
-              action: <Button asChild size="sm"><Link to={`/transactions/${newTransaction.id}`}>Lihat</Link></Button>
+              action: <Button size="sm" onClick={() => navigate(`/transactions/${newTransaction.id}`)}>Lihat</Button>
             })
           },
           onError: (error) => {
