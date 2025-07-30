@@ -12,6 +12,7 @@ import { useAuthContext } from "@/contexts/AuthContext"
 import { supabase } from "@/integrations/supabase/client"
 import { useEffect, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
+import { PasswordInput } from "@/components/PasswordInput"
 
 const profileSchema = z.object({
   email: z.string().email("Email tidak valid."),
@@ -150,12 +151,12 @@ export default function AccountSettingsPage() {
           <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4 max-w-lg">
             <div className="space-y-2">
               <Label htmlFor="newPassword">Password Baru</Label>
-              <Input id="newPassword" type="password" {...passwordForm.register("newPassword")} />
+              <PasswordInput id="newPassword" {...passwordForm.register("newPassword")} />
               {passwordForm.formState.errors.newPassword && <p className="text-sm text-destructive">{passwordForm.formState.errors.newPassword.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Konfirmasi Password Baru</Label>
-              <Input id="confirmPassword" type="password" {...passwordForm.register("confirmPassword")} />
+              <PasswordInput id="confirmPassword" {...passwordForm.register("confirmPassword")} />
               {passwordForm.formState.errors.confirmPassword && <p className="text-sm text-destructive">{passwordForm.formState.errors.confirmPassword.message}</p>}
             </div>
             <Button type="submit" disabled={isPasswordUpdating}>

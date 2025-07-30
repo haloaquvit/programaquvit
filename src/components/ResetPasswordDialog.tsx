@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "./ui/use-toast"
 import { Employee } from "@/types/employee"
 import { useEmployees } from "@/hooks/useEmployees"
+import { PasswordInput } from "./PasswordInput"
 
 const passwordSchema = z.object({
   newPassword: z.string().min(6, "Password baru minimal 6 karakter."),
@@ -60,12 +61,12 @@ export function ResetPasswordDialog({ open, onOpenChange, employee }: ResetPassw
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <Label htmlFor="newPassword">Password Baru</Label>
-            <Input id="newPassword" type="password" {...register("newPassword")} />
+            <PasswordInput id="newPassword" {...register("newPassword")} />
             {errors.newPassword && <p className="text-sm text-destructive mt-1">{errors.newPassword.message}</p>}
           </div>
           <div>
             <Label htmlFor="confirmPassword">Konfirmasi Password Baru</Label>
-            <Input id="confirmPassword" type="password" {...register("confirmPassword")} />
+            <PasswordInput id="confirmPassword" {...register("confirmPassword")} />
             {errors.confirmPassword && <p className="text-sm text-destructive mt-1">{errors.confirmPassword.message}</p>}
           </div>
           <DialogFooter>

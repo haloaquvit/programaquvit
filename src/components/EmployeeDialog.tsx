@@ -12,6 +12,7 @@ import { Textarea } from "./ui/textarea"
 import { useToast } from "./ui/use-toast"
 import { Employee, UserRole, EmployeeStatus } from "@/types/employee"
 import { useEmployees } from "@/hooks/useEmployees"
+import { PasswordInput } from "./PasswordInput"
 
 const baseSchema = {
   name: z.string().min(3, "Nama minimal 3 karakter.").transform(val => val.trim()),
@@ -135,7 +136,7 @@ export function EmployeeDialog({ open, onOpenChange, employee }: EmployeeDialogP
             {!isEditing && (
               <div className="space-y-2">
                 <Label htmlFor="password">Password Awal</Label>
-                <Input id="password" type="password" {...form.register("password")} />
+                <PasswordInput id="password" {...form.register("password")} />
                 {(form.formState.errors as any).password && <p className="text-sm text-destructive">{(form.formState.errors as any).password.message}</p>}
               </div>
             )}

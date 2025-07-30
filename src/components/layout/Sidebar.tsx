@@ -55,7 +55,7 @@ export function Sidebar({ isCollapsed, setCollapsed }: SidebarProps) {
   const location = useLocation();
 
   return (
-    <div className="hidden border-r bg-muted/40 md:block">
+    <div className="border-r bg-muted/40">
       <TooltipProvider delayDuration={0}>
         <div className="flex h-full max-h-screen flex-col">
           <div className={cn("flex h-14 items-center border-b lg:h-[60px]", isCollapsed ? "justify-center" : "px-4 lg:px-6")}>

@@ -1,83 +1,105 @@
 "use client"
 import { Link } from "react-router-dom"
-import { useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { FileWarning, AlertTriangle, ClipboardList, ShoppingCart, ArrowRight } from "lucide-react"
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip } from "recharts"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useAuthContext } from "@/contexts/AuthContext"
 import { useTransactions } from "@/hooks/useTransactions"
+import { useCustomers } from "@/hooks/useCustomers"
 import { useMaterials } from "@/hooks/useMaterials"
-import { usePurchaseOrders } from "@/hooks/usePurchaseOrders"
-import { format, startOfMonth } from "date-fns"
+import { format, subDays, startOfDay, endOfDay, startOfMonth, isWithinInterval } from "date-fns"
 import { id } from "date-fns/locale/id"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { ArrowUpRight, Users, PackageWarning, DollarSign } from "lucide-react"
 
 export function Dashboard() {
-  const { transactions } = useTransactions()
-  const { materials } = useMaterials()
-  const { purchaseOrders } = usePurchaseOrders()
+  const { user } = useAuthContext()
+  const { transactions, isLoading: transactionsLoading } = useTransactions()
+  const { customers, isLoading: customersLoading } = useCustomers()
+  const { materials, isLoading: materialsLoading } = useMaterials()
 
-  const summaryCards = useMemo(() => {
-    const totalPiutang = transactions?.filter(t => t.paymentStatus === 'Belum Lunas').reduce((sum, t) => sum + (t.total - t.paidAmount), 0) || 0
-    const stokKritisCount = materials?.filter(m => m.stock < m.minStock).length || 0
-    const poPendingCount = purchaseOrders?.filter(po => po.status === 'Pending').length || 0
-    const transaksiPendingCount = transactions?.filter(t => t.status !== 'Pesanan Selesai' && t.status !== 'Dibatalkan').length || 0
-    return { totalPiutang, stokKritisCount, poPendingCount, transaksiPendingCount }
-  }, [transactions, materials, purchaseOrders])
+  const today = new Date()
+  const startOfToday = startOfDay(today)
+  const endOfToday = endOfDay(today)
+  const startOfThisMonth = startOfMonth(today)
 
-  const monthlySalesData = useMemo(() => {
-    if (!transactions) return []
-    const salesByMonth: { [key: string]: number } = {}
-    transactions.forEach(t => {
-      const month = format(startOfMonth(new Date(t.orderDate)), "MMM yyyy", { locale: id })
-      salesByMonth[month] = (salesByMonth[month] || 0) + t.total
-    })
-    return Object.entries(salesByMonth).map(([name, total]) => ({ name, total })).slice(-6) // Ambil 6 bulan terakhir
-  }, [transactions])
+  const todayTransactions = transactions?.filter(t => new Date(t.orderDate) >= startOfToday && new Date(t.orderDate) <= endOfToday) || []
+  const todayIncome = todayTransactions.reduce((sum, t) => sum + t.total, 0)
+  const newCustomersThisMonth = customers?.filter(c => new Date(c.createdAt) >= startOfThisMonth).length || 0
+  const criticalStockItems = materials?.filter(m => m.stock <= m.minStock).length || 0
 
-  const lowStockMaterials = useMemo(() => {
-    return materials?.filter(m => m.stock < m.minStock).slice(0, 5) || []
-  }, [materials])
+  const last7Days = Array.from({ length: 7 }, (_, i) => subDays(today, i)).reverse()
+  const chartData = last7Days.map(date => {
+    const dailyTransactions = transactions?.filter(t => isWithinInterval(new Date(t.orderDate), { start: startOfDay(date), end: endOfDay(date) })) || []
+    return {
+      name: format(date, 'EEE', { locale: id }),
+      Pendapatan: dailyTransactions.reduce((sum, t) => sum + t.total, 0),
+    }
+  })
+
+  const recentTransactions = transactions?.slice(0, 5) || []
+  const isLoading = transactionsLoading || customersLoading || materialsLoading
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-1/4" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+          <Card className="col-span-4"><CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader><CardContent><Skeleton className="h-64" /></CardContent></Card>
+          <Card className="col-span-3"><CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader><CardContent><Skeleton className="h-64" /></CardContent></Card>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <Tabs defaultValue="summary" className="space-y-4">
-      <TabsList>
-        <TabsTrigger value="summary">Ringkasan</TabsTrigger>
-        <TabsTrigger value="sales">Analisis Penjualan</TabsTrigger>
-        <TabsTrigger value="inventory">Stok & PO</TabsTrigger>
-      </TabsList>
+    <div className="flex flex-col gap-6">
+      <h1 className="text-3xl font-bold tracking-tight">Selamat Datang, {user?.name || 'Pengguna'}!</h1>
+      
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Pendapatan Hari Ini</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(todayIncome)}</div><p className="text-xs text-muted-foreground">{todayTransactions.length} transaksi</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Pelanggan Baru (Bulan Ini)</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">+{newCustomersThisMonth}</div><p className="text-xs text-muted-foreground">Sejak {format(startOfThisMonth, "d MMM")}</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Stok Kritis</CardTitle><PackageWarning className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{criticalStockItems} item</div><p className="text-xs text-muted-foreground">Perlu segera dipesan ulang</p></CardContent></Card>
+        <Card className="bg-primary text-primary-foreground"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Buat Transaksi Baru</CardTitle></CardHeader><CardContent><Link to="/pos"><Button variant="secondary" className="w-full">Buka Kasir (POS) <ArrowUpRight className="ml-2 h-4 w-4" /></Button></Link></CardContent></Card>
+      </div>
 
-      <TabsContent value="summary" className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Link to="/receivables">
-            <Card className="hover:bg-muted/50">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Piutang</CardTitle>
-                <FileWarning className="h-4 w-4 text-destructive" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-destructive">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(summaryCards.totalPiutang)}</div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Stok Kritis</CardTitle><AlertTriangle className="h-4 w-4 text-amber-500" /></CardHeader><CardContent><div className="text-2xl font-bold">{summaryCards.stokKritisCount} Item</div></CardContent></Card>
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">PO Pending</CardTitle><ClipboardList className="h-4 w-4 text-primary" /></CardHeader><CardContent><div className="text-2xl font-bold">{summaryCards.poPendingCount} Permintaan</div></CardContent></Card>
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Transaksi Berjalan</CardTitle><ShoppingCart className="h-4 w-4 text-primary" /></CardHeader><CardContent><div className="text-2xl font-bold">{summaryCards.transaksiPendingCount}</div></CardContent></Card>
-        </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Transaksi Terbaru</CardTitle>
-          </CardHeader>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
+          <CardHeader><CardTitle>Pendapatan 7 Hari Terakhir</CardTitle></CardHeader>
+          <CardContent className="pl-2">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${new Intl.NumberFormat("id-ID", { notation: "compact", compactDisplay: "short" }).format(value as number)}`} />
+                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'hsl(var(--muted))' }} />
+                <Legend />
+                <Bar dataKey="Pendapatan" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card className="col-span-3">
+          <CardHeader><CardTitle>Transaksi Terbaru</CardTitle><CardDescription>5 transaksi terakhir yang tercatat.</CardDescription></CardHeader>
           <CardContent>
             <Table>
               <TableHeader><TableRow><TableHead>Pelanggan</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
               <TableBody>
-                {transactions?.slice(0, 5).map(t => (
-                  <TableRow key={t.id} className="hover:bg-muted/50">
-                    <TableCell><Link to={`/transactions/${t.id}`} className="font-medium hover:underline">{t.customerName}</Link></TableCell>
-                    <TableCell><Badge>{t.status}</Badge></TableCell>
+                {recentTransactions.map(t => (
+                  <TableRow key={t.id}>
+                    <TableCell>
+                      <div className="font-medium">{t.customerName}</div>
+                      <div className="hidden text-sm text-muted-foreground md:inline">{t.id}</div>
+                    </TableCell>
+                    <TableCell><Badge variant={t.paymentStatus === 'Lunas' ? 'default' : 'destructive'}>{t.paymentStatus}</Badge></TableCell>
                     <TableCell className="text-right">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(t.total)}</TableCell>
                   </TableRow>
                 ))}
@@ -85,60 +107,7 @@ export function Dashboard() {
             </Table>
           </CardContent>
         </Card>
-      </TabsContent>
-
-      <TabsContent value="sales" className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Grafik Penjualan Bulanan</CardTitle>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={monthlySalesData}>
-                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `Rp${Number(value) / 1000000}Jt`} />
-                <RechartsTooltip cursor={{ fill: 'hsl(var(--muted))' }} contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
-                <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="inventory" className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Bahan Stok Kritis</CardTitle>
-            <Button asChild variant="outline" size="sm"><Link to="/materials">Lihat Semua <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader><TableRow><TableHead>Bahan</TableHead><TableHead className="text-right">Sisa Stok</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {lowStockMaterials.map(m => (
-                  <TableRow key={m.id}><TableCell>{m.name}</TableCell><TableCell className="text-right"><Badge variant="destructive">{m.stock} {m.unit}</Badge></TableCell></TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Purchase Order Pending</CardTitle>
-            <Button asChild variant="outline" size="sm"><Link to="/purchase-orders">Lihat Semua <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader><TableRow><TableHead>Bahan</TableHead><TableHead>Pemohon</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {purchaseOrders?.filter(po => po.status === 'Pending').slice(0, 5).map(po => (
-                  <TableRow key={po.id}><TableCell>{po.materialName}</TableCell><TableCell>{po.requestedBy}</TableCell></TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
   )
 }

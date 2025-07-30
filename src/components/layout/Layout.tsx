@@ -1,33 +1,26 @@
 "use client"
+import { useState } from "react"
+import { Sidebar } from "./Sidebar"
+import { Header } from "./Header"
 
-import { Outlet } from "react-router-dom";
-import { Sidebar } from "./Sidebar";
-import { Header } from "./Header";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+interface LayoutProps {
+  children: React.ReactNode
+}
 
-export function Layout() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export function Layout({ children }: LayoutProps) {
+  const [isCollapsed, setCollapsed] = useState(false)
 
   return (
-    <div
-      className={cn(
-        "grid min-h-screen w-full",
-        isCollapsed
-          ? "md:grid-cols-[56px_1fr]"
-          : "md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]"
-      )}
-    >
-      <Sidebar
-        isCollapsed={isCollapsed}
-        setCollapsed={setIsCollapsed}
-      />
+    <div className="grid min-h-screen w-full md:grid-cols-[auto_1fr]">
+      <div className="hidden md:block">
+        <Sidebar isCollapsed={isCollapsed} setCollapsed={setCollapsed} />
+      </div>
       <div className="flex flex-col">
         <Header />
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40 overflow-auto">
-          <Outlet />
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 overflow-auto">
+          {children}
         </main>
       </div>
     </div>
-  );
+  )
 }
