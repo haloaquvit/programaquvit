@@ -18,26 +18,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      if (session?.user) {
-        await fetchUserProfile(session.user);
-      }
-      setIsLoading(false);
-    };
-
-    getInitialSession();
-
+    // onAuthStateChange akan berjalan saat inisialisasi dan setiap kali status auth berubah.
+    // Ini menyederhanakan logika dan menghilangkan kebutuhan getInitialSession().
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user) {
         setIsLoading(true);
         await fetchUserProfile(session.user);
-        setIsLoading(false);
       } else {
         setUser(null);
       }
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
