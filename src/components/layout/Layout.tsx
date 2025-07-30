@@ -1,13 +1,10 @@
 "use client"
 import { useState } from "react"
+import { Outlet } from "react-router-dom"
 import { Sidebar } from "./Sidebar"
 import { Header } from "./Header"
 
-interface LayoutProps {
-  children: React.ReactNode
-}
-
-export function Layout({ children }: LayoutProps) {
+export function Layout() {
   const [isCollapsed, setCollapsed] = useState(false)
 
   return (
@@ -18,7 +15,7 @@ export function Layout({ children }: LayoutProps) {
       <div className="flex flex-col">
         <Header />
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 overflow-auto">
-          {children}
+          <Outlet />
         </main>
       </div>
     </div>
