@@ -12,7 +12,7 @@ import { useMaterials } from "@/hooks/useMaterials"
 import { format, subDays, startOfDay, endOfDay, startOfMonth, isWithinInterval } from "date-fns"
 import { id } from "date-fns/locale/id"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { ArrowUpRight, Users, PackageWarning, DollarSign } from "lucide-react"
+import { ArrowUpRight, Users, AlertTriangle, DollarSign } from "lucide-react" // Mengganti PackageWarning dengan AlertTriangle
 
 export function Dashboard() {
   const { user } = useAuthContext()
@@ -67,7 +67,7 @@ export function Dashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Pendapatan Hari Ini</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(todayIncome)}</div><p className="text-xs text-muted-foreground">{todayTransactions.length} transaksi</p></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Pelanggan Baru (Bulan Ini)</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">+{newCustomersThisMonth}</div><p className="text-xs text-muted-foreground">Sejak {format(startOfThisMonth, "d MMM")}</p></CardContent></Card>
-        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Stok Kritis</CardTitle><PackageWarning className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{criticalStockItems} item</div><p className="text-xs text-muted-foreground">Perlu segera dipesan ulang</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Stok Kritis</CardTitle><AlertTriangle className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{criticalStockItems} item</div><p className="text-xs text-muted-foreground">Perlu segera dipesan ulang</p></CardContent></Card>
         <Card className="bg-primary text-primary-foreground"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Buat Transaksi Baru</CardTitle></CardHeader><CardContent><Link to="/pos"><Button variant="secondary" className="w-full">Buka Kasir (POS) <ArrowUpRight className="ml-2 h-4 w-4" /></Button></Link></CardContent></Card>
       </div>
 
