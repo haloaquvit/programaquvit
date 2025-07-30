@@ -73,6 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             id: supabaseUser.id,
             email: supabaseUser.email,
             full_name: supabaseUser.user_metadata?.full_name || 'Nama Belum Diatur',
+            username: supabaseUser.user_metadata?.username || null, // Menambahkan username
             role: supabaseUser.user_metadata?.role || 'karyawan',
             status: 'Aktif'
           })
@@ -87,6 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const employeeProfile: Employee = {
             id: newProfile.id,
             name: newProfile.full_name,
+            username: newProfile.username, // Menambahkan username
             email: newProfile.email,
             role: newProfile.role,
             phone: newProfile.phone,
@@ -103,6 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const employeeProfile: Employee = {
         id: data.id,
         name: data.full_name,
+        username: data.username, // Menambahkan username
         email: data.email,
         role: data.role,
         phone: data.phone,
@@ -126,6 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         setSession(session);
         if (session?.user) {
+          setIsLoading(true); // Set loading to true before fetching profile
           await fetchUserProfile(session.user);
         } else {
           setUser(null);
@@ -133,7 +137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (e) {
         console.error("Unexpected error during session initialization:", e);
       } finally {
-        setIsLoading(false);
+        setIsLoading(false); // Set loading to false after initial load
       }
     };
 
@@ -142,9 +146,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user) {
+        setIsLoading(true); // Set loading to true on auth state change
         await fetchUserProfile(session.user);
+        setIsLoading(false); // Set loading to false after profile fetch
       } else {
         setUser(null);
+        setIsLoading(false); // Set loading to false if no user
       }
     });
 
