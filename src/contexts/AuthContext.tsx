@@ -12,7 +12,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { ReactNode }) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
             id: supabaseUser.id,
             email: supabaseUser.email,
             full_name: supabaseUser.user_metadata?.full_name || 'Nama Belum Diatur',
-            username: supabaseUser.user_metadata?.username || null, // Menambahkan username
+            username: supabaseUser.user_metadata?.username || null,
             role: supabaseUser.user_metadata?.role || 'karyawan',
             status: 'Aktif'
           })
@@ -88,7 +88,7 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
           const employeeProfile: Employee = {
             id: newProfile.id,
             name: newProfile.full_name,
-            username: newProfile.username, // Menambahkan username
+            username: newProfile.username,
             email: newProfile.email,
             role: newProfile.role,
             phone: newProfile.phone,
@@ -105,7 +105,7 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
       const employeeProfile: Employee = {
         id: data.id,
         name: data.full_name,
-        username: data.username, // Menambahkan username
+        username: data.username,
         email: data.email,
         role: data.role,
         phone: data.phone,
@@ -117,47 +117,15 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    const initializeSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error("Error getting session on mount:", error);
-          setSession(null);
-          setUser(null);
-          return;
-        }
-        
-        setSession(session);
-        if (session?.user) {
-          setIsLoading(true); // Set loading to true before fetching profile
-          await fetchUserProfile(session.user);
-        } else {
-          setUser(null);
-        }
-      } catch (e) {
-        console.error("Unexpected error during session initialization:", e);
-      } finally {
-        setIsLoading(false); // Set loading to false after initial load
-      }
-    };
-
-    initializeSession();
-
+    setIsLoading(true);
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
-      setIsLoading(true); // Set loading to true when auth state changes and we need to process
-      try {
-        if (session?.user) {
-          await fetchUserProfile(session.user);
-        } else {
-          setUser(null);
-        }
-      } catch (e) {
-        console.error("Error during auth state change processing:", e);
-        setUser(null); // Ensure user is null on error
-      } finally {
-        setIsLoading(false); // Always set to false after processing
+      if (session?.user) {
+        await fetchUserProfile(session.user);
+      } else {
+        setUser(null);
       }
+      setIsLoading(false);
     });
 
     return () => {

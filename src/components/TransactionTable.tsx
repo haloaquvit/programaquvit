@@ -161,6 +161,10 @@ export function TransactionTable() {
       },
     },
     {
+      accessorKey: "cashierName",
+      header: "Kasir",
+    },
+    {
       accessorKey: "total",
       header: () => <div className="text-right">Total</div>,
       cell: ({ row }) => {

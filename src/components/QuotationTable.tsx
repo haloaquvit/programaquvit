@@ -39,6 +39,7 @@ export function QuotationTable() {
       header: "Tgl Dibuat",
       cell: ({ row }) => format(new Date(row.getValue("createdAt")), "d MMM yyyy", { locale: id }),
     },
+    { accessorKey: "preparedBy", header: "Dibuat Oleh" },
     {
       accessorKey: "total",
       header: () => <div className="text-right">Total</div>,
