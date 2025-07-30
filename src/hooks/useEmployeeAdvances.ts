@@ -43,7 +43,7 @@ export const useEmployeeAdvances = () => {
   const { data: advances, isLoading, isError, error } = useQuery<EmployeeAdvance[]>({
     queryKey: ['employeeAdvances'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('employee_advances').select('*, advance_repayments(*)');
+      const { data, error } = await supabase.from('employee_advances').select('*, advance_repayments:advance_repayments(*)');
       if (error) {
         console.error("❌ Gagal mengambil data panjar:", error.message);
         throw new Error(error.message);
@@ -78,25 +78,22 @@ export const useEmployeeAdvances = () => {
   });
 
   const addRepayment = useMutation({
-    mutationFn: async ({ advanceId, repaymentData }: { advanceId: string, repaymentData: Omit<AdvanceRepayment, 'id'> }): Promise<EmployeeAdvance> => {
-      const { data: advance, error: fetchError } = await supabase.from('employee_advances').select('remaining_amount').eq('id', advanceId).single();
-      if (fetchError) throw fetchError;
-
+    mutationFn: async ({ advanceId, repaymentData }: { advanceId: string, repaymentData: Omit<AdvanceRepayment, 'id'> }): Promise<void> => {
       const newRepayment = {
         id: `rep-${Date.now()}`,
         advance_id: advanceId,
         amount: repaymentData.amount,
         date: repaymentData.date,
-        recorded_by: repaymentData.recordedBy, // FIX: Map camelCase to snake_case
+        recorded_by: repaymentData.recordedBy,
       };
       const { error: insertError } = await supabase.from('advance_repayments').insert(newRepayment);
       if (insertError) throw insertError;
 
-      const newRemainingAmount = advance.remaining_amount - repaymentData.amount;
-      const { data: updatedAdvance, error: updateError } = await supabase.from('employee_advances').update({ remaining_amount: newRemainingAmount }).eq('id', advanceId).select().single();
-      if (updateError) throw updateError;
-
-      return fromDbToApp(updatedAdvance);
+      // Call RPC to update remaining amount
+      const { error: rpcError } = await supabase.rpc('update_remaining_amount', {
+        p_advance_id: advanceId
+      });
+      if (rpcError) throw new Error(rpcError.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employeeAdvances'] });
