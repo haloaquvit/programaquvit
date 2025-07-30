@@ -18,7 +18,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider = ({ children }: { ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,12 +27,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
       const { data, error } = await supabase
-        .from('employees_view')
+        .from('employees_view') // atau 'profiles' kalau kamu pakai itu
         .select('*')
         .eq('id', supabaseUser.id)
         .single();
 
-      if (error) throw error;
+      if (error || !data) {
+        console.error('[AuthContext] Gagal ambil user profile:', error);
+        setUser(null); // fallback agar tidak stuck
+        return; // Penting: keluar dari fungsi jika ada error atau data kosong
+      }
 
       const employeeProfile: Employee = {
         id: data.id,
@@ -47,8 +51,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setUser(employeeProfile);
     } catch (err) {
-      console.error('[Auth] Failed to fetch user profile:', err);
-      setUser(null);
+      console.error('[AuthContext] Error fetch profile:', err);
+      setUser(null); // fallback agar tidak stuck
     }
   };
 
@@ -69,9 +73,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (currentSession?.user) {
         await fetchUserProfile(currentSession.user);
+      } else {
+        setUser(null); // Pastikan user null jika tidak ada sesi
       }
-
-      setIsLoading(false);
+      
+      setIsLoading(false); // Pastikan isLoading selalu false setelah inisialisasi
     };
 
     initializeAuth();
@@ -86,6 +92,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setUser(null);
       }
+      // Tidak perlu setIsLoading(false) di sini karena initializeAuth sudah menanganinya
+      // dan onAuthStateChange tidak selalu berarti loading selesai, hanya perubahan state
     });
 
     return () => {
