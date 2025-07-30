@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import { createContext, useState, useEffect, useContext, ReactNode, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types/employee';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
@@ -16,10 +16,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const idleTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const signOut = useCallback(async () => {
+    if (idleTimer.current) {
+      clearTimeout(idleTimer.current);
+    }
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+  }, []);
+
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimer.current) {
+      clearTimeout(idleTimer.current);
+    }
+    idleTimer.current = setTimeout(() => {
+      console.log("Sesi berakhir karena tidak ada aktivitas. Pengguna akan dikeluarkan.");
+      signOut();
+    }, 8 * 60 * 60 * 1000); // 8 jam dalam milidetik
+  }, [signOut]);
 
   useEffect(() => {
-    // onAuthStateChange akan berjalan saat inisialisasi dan setiap kali status auth berubah.
-    // Ini menyederhanakan logika dan menghilangkan kebutuhan getInitialSession().
+    const activityEvents: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'click', 'scroll'];
+
+    if (session) {
+      resetIdleTimer();
+      activityEvents.forEach(event => {
+        window.addEventListener(event, resetIdleTimer);
+      });
+    }
+
+    return () => {
+      if (idleTimer.current) {
+        clearTimeout(idleTimer.current);
+      }
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetIdleTimer);
+      });
+    };
+  }, [session, resetIdleTimer]);
+
+  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user) {
@@ -35,7 +73,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
-    // Mengambil data dari employees_view untuk memastikan peran Owner konsisten
     const { data, error } = await supabase
       .from('employees_view')
       .select('*')
@@ -43,8 +80,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .single();
     
     if (error) {
-      // Jika profil tidak ditemukan (error code PGRST116), coba buat profil baru.
-      // Ini untuk menangani kasus pengguna lama yang belum memiliki profil.
       if (error.code === 'PGRST116') {
         console.warn('User profile not found. Attempting to create one.');
         const { data: newProfile, error: insertError } = await supabase
@@ -62,7 +97,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (insertError) {
           console.error("Failed to create fallback user profile:", insertError);
           setUser(null);
-          // Langsung logout jika pembuatan profil gagal agar tidak terjadi loop
           await supabase.auth.signOut();
         } else if (newProfile) {
           const employeeProfile: Employee = {
@@ -92,12 +126,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
       setUser(employeeProfile);
     }
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
   };
 
   const value = {
