@@ -36,13 +36,24 @@ export default function LoginPage() {
             supabaseClient={supabase}
             appearance={{ theme: ThemeSupa }}
             providers={[]}
-            view="sign_in" // Ini akan menyembunyikan tombol Daftar dan Lupa Password
             localization={{
               variables: {
                 sign_in: {
                   email_label: 'Alamat Email',
                   password_label: 'Password',
                   button_label: 'Masuk',
+                  link_text: 'Sudah punya akun? Masuk',
+                },
+                sign_up: {
+                  email_label: 'Alamat Email',
+                  password_label: 'Password',
+                  button_label: 'Daftar',
+                  link_text: 'Belum punya akun? Daftar',
+                },
+                forgotten_password: {
+                  email_label: 'Alamat Email',
+                  button_label: 'Kirim instruksi reset',
+                  link_text: 'Lupa password?',
                 },
               },
             }}
