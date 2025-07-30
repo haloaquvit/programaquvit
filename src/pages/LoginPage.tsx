@@ -28,7 +28,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <Package className="mx-auto h-12 w-12 text-primary" />
-          <CardTitle className="text-2xl font-bold mt-4">Kasir Percetakan</CardTitle>
+          <CardTitle className="text-2xl font-bold mt-4">Matahari Digital Printing</CardTitle>
           <CardDescription>Silakan masuk untuk melanjutkan</CardDescription>
         </CardHeader>
         <CardContent>

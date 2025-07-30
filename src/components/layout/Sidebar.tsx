@@ -61,7 +61,7 @@ export function Sidebar({ isCollapsed, setCollapsed }: SidebarProps) {
           <div className={cn("flex h-14 items-center border-b lg:h-[60px]", isCollapsed ? "justify-center" : "px-4 lg:px-6")}>
             <Link to="/" className="flex items-center gap-2 font-semibold">
               <Package className="h-6 w-6 text-primary" />
-              <span className={cn(isCollapsed && "hidden")}>Kasir Percetakan</span>
+              <span className={cn(isCollapsed && "hidden")}>Matahari Digital Printing</span>
             </Link>
           </div>
           <nav className="flex-1 space-y-2 overflow-auto py-4 px-2">

@@ -113,6 +113,20 @@ export const useTransactions = () => {
     }
   });
 
+  const deleteTransaction = useMutation({
+    mutationFn: async (transactionId: string) => {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', transactionId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    },
+  });
+
   const deductMaterials = useMutation({
     mutationFn: async (transactionId: string) => {
       const { error } = await supabase.rpc('deduct_materials_for_transaction', {
@@ -125,7 +139,7 @@ export const useTransactions = () => {
     },
   });
 
-  return { transactions, isLoading, addTransaction, payReceivable, updateTransactionStatus, deductMaterials }
+  return { transactions, isLoading, addTransaction, payReceivable, updateTransactionStatus, deductMaterials, deleteTransaction }
 }
 
 export const useTransactionById = (id: string) => {

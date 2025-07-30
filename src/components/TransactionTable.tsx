@@ -9,7 +9,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { MoreHorizontal, PlusCircle, FileDown } from "lucide-react"
+import { MoreHorizontal, PlusCircle, FileDown, Trash2 } from "lucide-react"
 import * as XLSX from "xlsx"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -22,8 +22,19 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import {
   Table,
@@ -79,7 +90,9 @@ export function TransactionTable() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { transactions, isLoading, updateTransactionStatus, deductMaterials } = useTransactions();
+  const { transactions, isLoading, updateTransactionStatus, deductMaterials, deleteTransaction } = useTransactions();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [selectedTransaction, setSelectedTransaction] = React.useState<Transaction | null>(null);
 
   const handleStatusChange = (transactionId: string, newStatus: TransactionStatus) => {
     updateTransactionStatus.mutate({ transactionId, status: newStatus }, {
@@ -88,7 +101,6 @@ export function TransactionTable() {
           title: "Status Diperbarui",
           description: `Status untuk pesanan ${transactionId} diubah menjadi "${newStatus}".`,
         });
-        // Jika status baru adalah 'Proses Produksi', kurangi stok
         if (newStatus === 'Proses Produksi') {
           deductMaterials.mutate(transactionId, {
             onSuccess: () => {
@@ -107,6 +119,25 @@ export function TransactionTable() {
         toast({ variant: "destructive", title: "Gagal", description: error.message });
       }
     });
+  };
+
+  const handleDeleteClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (selectedTransaction) {
+      deleteTransaction.mutate(selectedTransaction.id, {
+        onSuccess: () => {
+          toast({ title: "Transaksi Dihapus", description: `Transaksi ${selectedTransaction.id} berhasil dihapus.` });
+          setIsDeleteDialogOpen(false);
+        },
+        onError: (error) => {
+          toast({ variant: "destructive", title: "Gagal Hapus", description: error.message });
+        }
+      });
+    }
   };
 
   const columns: ColumnDef<Transaction>[] = [
@@ -170,6 +201,7 @@ export function TransactionTable() {
     {
       id: "actions",
       cell: ({ row }) => {
+        const transaction = row.original;
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -180,7 +212,19 @@ export function TransactionTable() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
               <DropdownMenuLabel>Aksi</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => navigate(`/transactions/${row.original.id}`)}>Lihat Detail</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate(`/transactions/${transaction.id}`)}>Lihat Detail</DropdownMenuItem>
+              {user && user.role === 'owner' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-red-500 focus:text-red-500"
+                    onClick={() => handleDeleteClick(transaction)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Hapus Transaksi
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )
@@ -269,6 +313,26 @@ export function TransactionTable() {
         <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button>
         <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button>
       </div>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tindakan ini tidak dapat dibatalkan. Ini akan menghapus data transaksi dengan nomor order <strong>{selectedTransaction?.id}</strong> secara permanen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(badgeVariants({ variant: "destructive" }))}
+              onClick={confirmDelete}
+              disabled={deleteTransaction.isPending}
+            >
+              {deleteTransaction.isPending ? "Menghapus..." : "Ya, Hapus"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
