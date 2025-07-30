@@ -57,22 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [session, resetIdleTimer]);
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session?.user) {
-        setIsLoading(true);
-        await fetchUserProfile(session.user);
-      } else {
-        setUser(null);
-      }
-      setIsLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
+  const fetchUserProfile = useCallback(async (supabaseUser: SupabaseUser) => {
     const { data, error } = await supabase
       .from('employees_view')
       .select('*')
@@ -126,7 +111,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
       setUser(employeeProfile);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('Auth state changed:', _event, 'Session:', session);
+      setSession(session);
+      if (session?.user) {
+        try {
+          await fetchUserProfile(session.user);
+        } catch (error) {
+          console.error("Error during user profile fetch:", error);
+          setUser(null);
+        } finally {
+          setIsLoading(false); // Ensure isLoading is false after profile fetch attempt
+        }
+      } else {
+        setUser(null);
+        setIsLoading(false); // Ensure isLoading is false if no session user
+      }
+      console.log('isLoading after state change:', isLoading);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [fetchUserProfile, isLoading]); // Added fetchUserProfile and isLoading to dependencies
 
   const value = {
     session,
