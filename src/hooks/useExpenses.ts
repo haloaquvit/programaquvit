@@ -47,8 +47,10 @@ export const useExpenses = () => {
         .single();
       if (error) throw new Error(error.message);
       
-      // Kurangi saldo akun yang digunakan
-      updateAccountBalance.mutate({ accountId: newExpenseData.accountId, amount: -newExpenseData.amount });
+      // Kurangi saldo akun yang digunakan, jika ada
+      if (newExpenseData.accountId) {
+        updateAccountBalance.mutate({ accountId: newExpenseData.accountId, amount: -newExpenseData.amount });
+      }
       return fromDbToApp(data);
     },
     onSuccess: () => {
@@ -70,8 +72,10 @@ export const useExpenses = () => {
       if (!deletedExpense) throw new Error("Pengeluaran tidak ditemukan");
       
       const appExpense = fromDbToApp(deletedExpense);
-      // Kembalikan saldo ke akun yang digunakan
-      updateAccountBalance.mutate({ accountId: appExpense.accountId, amount: appExpense.amount });
+      // Kembalikan saldo ke akun yang digunakan, jika ada
+      if (appExpense.accountId) {
+        updateAccountBalance.mutate({ accountId: appExpense.accountId, amount: appExpense.amount });
+      }
       
       return appExpense;
     },

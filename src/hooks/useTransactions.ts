@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Transaction } from '@/types/transaction'
 import { supabase } from '@/integrations/supabase/client'
+import { useExpenses } from './useExpenses'
 
 // Helper to map from DB (snake_case) to App (camelCase)
 const fromDb = (dbTransaction: any): Transaction => ({
@@ -43,6 +44,7 @@ const toDb = (appTransaction: Partial<Omit<Transaction, 'createdAt'>>) => ({
 
 export const useTransactions = () => {
   const queryClient = useQueryClient()
+  const { addExpense } = useExpenses()
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ['transactions'],
@@ -94,7 +96,40 @@ export const useTransactions = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['receivables'] });
+    }
+  });
+
+  const writeOffReceivable = useMutation({
+    mutationFn: async (transaction: Transaction) => {
+      const amountToWriteOff = transaction.total - transaction.paidAmount;
+      if (amountToWriteOff <= 0) {
+        throw new Error("Piutang ini sudah lunas atau tidak ada sisa tagihan.");
+      }
+
+      // Step 1: Create an expense for the written-off amount
+      await addExpense.mutateAsync({
+        description: `Penghapusan Piutang No. Order ${transaction.id}`,
+        amount: amountToWriteOff,
+        date: new Date(),
+        category: 'Penghapusan Piutang',
+      });
+
+      // Step 2: Update the transaction to mark it as fully paid
+      const { error: updateError } = await supabase
+        .from('transactions')
+        .update({
+          paid_amount: transaction.total,
+          payment_status: 'Lunas'
+        })
+        .eq('id', transaction.id);
+
+      if (updateError) {
+        throw new Error(`Gagal memperbarui transaksi: ${updateError.message}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
     }
   });
 
@@ -139,7 +174,7 @@ export const useTransactions = () => {
     },
   });
 
-  return { transactions, isLoading, addTransaction, payReceivable, updateTransactionStatus, deductMaterials, deleteTransaction }
+  return { transactions, isLoading, addTransaction, payReceivable, writeOffReceivable, updateTransactionStatus, deductMaterials, deleteTransaction }
 }
 
 export const useTransactionById = (id: string) => {
