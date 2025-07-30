@@ -93,6 +93,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // Log untuk debugging
+  useEffect(() => {
+    console.log('[AuthContext] session:', session);
+    console.log('[AuthContext] user:', user);
+    console.log('[AuthContext] isLoading:', isLoading);
+  }, [session, user, isLoading]);
+
   return (
     <AuthContext.Provider
       value={{ session, user, isLoading, signOut }}

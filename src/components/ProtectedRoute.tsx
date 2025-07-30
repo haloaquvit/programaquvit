@@ -6,6 +6,11 @@ import React from 'react'; // Import React for React.ReactNode
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading, session } = useAuthContext();
 
+  // Log untuk debugging
+  console.log('[ProtectedRoute] user:', user);
+  console.log('[ProtectedRoute] session:', session);
+  console.log('[ProtectedRoute] isLoading:', isLoading);
+
   if (isLoading) {
     console.log('[ProtectedRoute] Waiting for auth...');
     return <PageLoader />;
