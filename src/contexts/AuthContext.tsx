@@ -114,27 +114,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
+    const initializeSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error("Error getting session on mount:", error);
+          setSession(null);
+          setUser(null);
+          return;
+        }
+        
+        setSession(session);
+        if (session?.user) {
+          await fetchUserProfile(session.user);
+        } else {
+          setUser(null);
+        }
+      } catch (e) {
+        console.error("Unexpected error during session initialization:", e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('Auth state changed:', _event, 'Session:', session);
       setSession(session);
       if (session?.user) {
-        try {
-          await fetchUserProfile(session.user);
-        } catch (error) {
-          console.error("Error during user profile fetch:", error);
-          setUser(null);
-        } finally {
-          setIsLoading(false); // Ensure isLoading is false after profile fetch attempt
-        }
+        await fetchUserProfile(session.user);
       } else {
         setUser(null);
-        setIsLoading(false); // Ensure isLoading is false if no session user
       }
-      console.log('isLoading after state change:', isLoading);
     });
 
-    return () => subscription.unsubscribe();
-  }, [fetchUserProfile, isLoading]); // Added fetchUserProfile and isLoading to dependencies
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchUserProfile]);
 
   const value = {
     session,
