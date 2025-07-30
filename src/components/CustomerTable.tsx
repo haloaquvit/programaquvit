@@ -33,8 +33,23 @@ import {
 import { useCustomers } from "@/hooks/useCustomers"
 import { Customer } from "@/types/customer"
 import { Skeleton } from "./ui/skeleton"
+import { useAuthContext } from "@/contexts/AuthContext"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { showSuccess, showError } from "@/utils/toast"
 
-export const columns: ColumnDef<Customer>[] = [
+export const getColumns = (
+  onDeleteClick: (customer: Customer) => void,
+  userRole?: string
+): ColumnDef<Customer>[] => [
   {
     accessorKey: "name",
     header: "Nama",
@@ -68,6 +83,7 @@ export const columns: ColumnDef<Customer>[] = [
   {
     id: "actions",
     cell: ({ row }) => {
+      const customer = row.original;
       return (
         <div className="text-right">
           <DropdownMenu>
@@ -88,7 +104,14 @@ export const columns: ColumnDef<Customer>[] = [
             >
               <DropdownMenuLabel>Aksi</DropdownMenuLabel>
               <DropdownMenuItem>Edit</DropdownMenuItem>
-              <DropdownMenuItem className="text-red-500">Hapus</DropdownMenuItem>
+              {userRole === 'owner' && (
+                <DropdownMenuItem 
+                  className="text-red-500 hover:!text-red-500 hover:!bg-red-100"
+                  onClick={() => onDeleteClick(customer)}
+                >
+                  Hapus
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -98,9 +121,34 @@ export const columns: ColumnDef<Customer>[] = [
 ]
 
 export function CustomerTable() {
-  const { customers, isLoading } = useCustomers()
+  const { customers, isLoading, deleteCustomer } = useCustomers()
+  const { user } = useAuthContext()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const navigate = useNavigate()
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
+  const [selectedCustomer, setSelectedCustomer] = React.useState<Customer | null>(null)
+
+  const handleDeleteClick = (customer: Customer) => {
+    setSelectedCustomer(customer)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!selectedCustomer) return;
+
+    try {
+      await deleteCustomer.mutateAsync(selectedCustomer.id);
+      showSuccess("Pelanggan berhasil dihapus.");
+    } catch (error: any) {
+      showError(error.message || "Gagal menghapus pelanggan.");
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setSelectedCustomer(null);
+    }
+  };
+
+  const columns = React.useMemo(() => getColumns(handleDeleteClick, user?.role), [user?.role]);
 
   const table = useReactTable({
     data: customers || [],
@@ -171,6 +219,25 @@ export function CustomerTable() {
           </TableBody>
         </Table>
       </div>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tindakan ini akan menghapus pelanggan <strong>{selectedCustomer?.name}</strong> secara permanen. Pelanggan yang sudah memiliki transaksi tidak dapat dihapus.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Ya, Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

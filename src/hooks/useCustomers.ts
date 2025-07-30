@@ -32,10 +32,30 @@ export const useCustomers = () => {
     },
   });
 
+  const deleteCustomer = useMutation({
+    mutationFn: async (customerId: string) => {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', customerId);
+
+      if (error) {
+        if (error.code === '23503') {
+          throw new Error('Gagal: Pelanggan ini memiliki transaksi terkait.');
+        }
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    },
+  });
+
   return {
     customers,
     isLoading,
     addCustomer,
+    deleteCustomer,
   };
 }
 
