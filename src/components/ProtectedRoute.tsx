@@ -1,14 +1,15 @@
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import PageLoader from "@/components/PageLoader";
 
 const ProtectedRoute = () => {
-  const { session, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div>Loading...</div>; // Or a proper loading spinner component
+    return <PageLoader />;
   }
 
-  if (!session) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
