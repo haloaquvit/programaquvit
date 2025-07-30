@@ -14,5 +14,5 @@ export default defineConfig(() => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: "/", // Penting agar routing tidak rusak saat refresh di Vercel
+  base: "/", // ✅ Penting agar routing tidak rusak saat refresh di Vercel
 }));
