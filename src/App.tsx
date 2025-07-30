@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Layout } from "@/components/layout/Layout";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import ProtectedRoute from "@/components/ProtectedRoute"; // Updated import
 import { Suspense, lazy } from "react";
 import PageLoader from "@/components/PageLoader";
 
@@ -42,32 +42,31 @@ function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               
-              <Route element={<ProtectedRoute />}>
-                <Route element={<Layout />}>
-                  <Route path="/" element={<DashboardPage />} />
-                  <Route path="/pos" element={<PosPage />} />
-                  <Route path="/transactions" element={<TransactionListPage />} />
-                  <Route path="/transactions/:id" element={<TransactionDetailPage />} />
-                  <Route path="/quotations" element={<QuotationListPage />} />
-                  <Route path="/quotations/new" element={<NewQuotationPage />} />
-                  <Route path="/quotations/:id" element={<QuotationDetailPage />} />
-                  <Route path="/products" element={<ProductPage />} />
-                  <Route path="/materials" element={<MaterialPage />} />
-                  <Route path="/customers" element={<CustomerPage />} />
-                  <Route path="/customers/:id" element={<CustomerDetailPage />} />
-                  <Route path="/employees" element={<EmployeePage />} />
-                  <Route path="/purchase-orders" element={<PurchaseOrderPage />} />
-                  <Route path="/accounts" element={<AccountingPage />} />
-                  <Route path="/accounts/:id" element={<AccountDetailPage />} />
-                  <Route path="/receivables" element={<ReceivablesPage />} />
-                  <Route path="/expenses" element={<ExpensePage />} />
-                  <Route path="/advances" element={<EmployeeAdvancePage />} />
-                  <Route path="/financial-report" element={<FinancialReportPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/account-settings" element={<AccountSettingsPage />} />
-                  <Route path="/attendance" element={<AttendancePage />} />
-                  <Route path="/attendance/report" element={<AttendanceReportPage />} />
-                </Route>
+              {/* Protected routes wrapped by ProtectedRoute component */}
+              <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/pos" element={<PosPage />} />
+                <Route path="/transactions" element={<TransactionListPage />} />
+                <Route path="/transactions/:id" element={<TransactionDetailPage />} />
+                <Route path="/quotations" element={<QuotationListPage />} />
+                <Route path="/quotations/new" element={<NewQuotationPage />} />
+                <Route path="/quotations/:id" element={<QuotationDetailPage />} />
+                <Route path="/products" element={<ProductPage />} />
+                <Route path="/materials" element={<MaterialPage />} />
+                <Route path="/customers" element={<CustomerPage />} />
+                <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                <Route path="/employees" element={<EmployeePage />} />
+                <Route path="/purchase-orders" element={<PurchaseOrderPage />} />
+                <Route path="/accounts" element={<AccountingPage />} />
+                <Route path="/accounts/:id" element={<AccountDetailPage />} />
+                <Route path="/receivables" element={<ReceivablesPage />} />
+                <Route path="/expenses" element={<ExpensePage />} />
+                <Route path="/advances" element={<EmployeeAdvancePage />} />
+                <Route path="/financial-report" element={<FinancialReportPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/account-settings" element={<AccountSettingsPage />} />
+                <Route path="/attendance" element={<AttendancePage />} />
+                <Route path="/attendance/report" element={<AttendanceReportPage />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />
