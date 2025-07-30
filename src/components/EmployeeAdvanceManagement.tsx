@@ -48,7 +48,7 @@ export function EmployeeAdvanceManagement() {
   const { user } = useAuth()
   const { users: employees, isLoading: loadingUsers } = useUsers()
   const { accounts, isLoading: loadingAccounts } = useAccounts()
-  const { advances, isLoading: loadingAdvances, addAdvance, deleteAdvance } = useEmployeeAdvances()
+  const { advances, isLoading: loadingAdvances, addAdvance, deleteAdvance, isError, error: advancesError } = useEmployeeAdvances()
   const [isRepayDialogOpen, setIsRepayDialogOpen] = useState(false)
   const [selectedAdvance, setSelectedAdvance] = useState<EmployeeAdvance | null>(null)
 
@@ -107,6 +107,22 @@ export function EmployeeAdvanceManagement() {
 
   const isAdminOrOwner = user?.role === 'admin' || user?.role === 'owner';
   const isOwner = user?.role === 'owner';
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-destructive">Gagal Memuat Data</CardTitle>
+          <CardDescription>
+            Terjadi kesalahan saat mengambil data panjar karyawan. Silakan coba muat ulang halaman.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Detail Error: {advancesError?.message}</p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="space-y-6">

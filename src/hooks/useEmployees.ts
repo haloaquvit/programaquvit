@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client'
 export const useEmployees = () => {
   const queryClient = useQueryClient();
 
-  const { data: employees, isLoading, error } = useQuery<Employee[]>({
+  const { data: employees, isLoading, error, isError } = useQuery<Employee[]>({
     queryKey: ['employees'],
     queryFn: async () => {
       const { data, error: queryError } = await supabase
@@ -91,6 +91,7 @@ export const useEmployees = () => {
     employees,
     isLoading,
     error,
+    isError,
     createEmployee,
     updateEmployee,
     resetPassword,

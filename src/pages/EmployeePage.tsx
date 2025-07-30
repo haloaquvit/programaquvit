@@ -30,7 +30,7 @@ export default function EmployeePage() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const { user } = useAuth()
   const { toast } = useToast()
-  const { employees, isLoading, deleteEmployee } = useEmployees()
+  const { employees, isLoading, deleteEmployee, isError, error } = useEmployees()
 
   const handleOpenDialog = (employee: Employee | null) => {
     setSelectedEmployee(employee)
@@ -51,6 +51,22 @@ export default function EmployeePage() {
         toast({ variant: "destructive", title: "Gagal", description: error.message })
       }
     })
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-destructive">Gagal Memuat Data</CardTitle>
+          <CardDescription>
+            Terjadi kesalahan saat mengambil data karyawan. Silakan coba muat ulang halaman.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Detail Error: {error?.message}</p>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (

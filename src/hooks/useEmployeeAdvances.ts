@@ -40,11 +40,14 @@ export const useEmployeeAdvances = () => {
   const queryClient = useQueryClient();
   const { updateAccountBalance } = useAccounts();
 
-  const { data: advances, isLoading } = useQuery<EmployeeAdvance[]>({
+  const { data: advances, isLoading, isError, error } = useQuery<EmployeeAdvance[]>({
     queryKey: ['employeeAdvances'],
     queryFn: async () => {
       const { data, error } = await supabase.from('employee_advances').select('*, advance_repayments(*)');
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("❌ Gagal mengambil data panjar:", error.message);
+        throw new Error(error.message);
+      }
       return data ? data.map(fromDbToApp) : [];
     }
   });
@@ -121,6 +124,8 @@ export const useEmployeeAdvances = () => {
   return {
     advances,
     isLoading,
+    isError,
+    error,
     addAdvance,
     addRepayment,
     deleteAdvance,
