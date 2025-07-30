@@ -24,6 +24,7 @@ serve(async (req) => {
     )
 
     // Step 1: Create the user in auth.users
+    // All profile data is passed in user_metadata to be handled by the handle_new_user trigger
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -31,6 +32,9 @@ serve(async (req) => {
       user_metadata: {
         full_name,
         role,
+        phone,    // Pass phone to user_metadata
+        address,  // Pass address to user_metadata
+        status,   // Pass status to user_metadata
       }
     })
 
@@ -42,26 +46,8 @@ serve(async (req) => {
         throw new Error("User creation failed, user data not returned.")
     }
 
-    const user = authData.user
-
-    // Step 2: Insert the profile into public.profiles
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .insert({
-        id: user.id,
-        email: user.email,
-        full_name: full_name,
-        role: role,
-        phone: phone,
-        address: address,
-        status: status,
-      })
-
-    if (profileError) {
-      // If profile creation fails, delete the auth user to keep things consistent.
-      await supabaseAdmin.auth.admin.deleteUser(user.id)
-      throw new Error(`Failed to create profile: ${profileError.message}`)
-    }
+    // The profile creation in public.profiles is now handled by the 'handle_new_user' trigger
+    // which fires automatically after a new user is created in auth.users.
 
     return new Response(JSON.stringify({ user: authData.user }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
