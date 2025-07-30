@@ -1,4 +1,10 @@
-import { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
+import {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  ReactNode,
+} from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types/employee';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
@@ -7,7 +13,7 @@ interface AuthContextType {
   session: Session | null;
   user: Employee | null;
   isLoading: boolean;
-  signOut: () => void;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,77 +23,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<Employee | null> => {
-    const { data, error } = await supabase
-      .from('employees_view')
-      .select('*')
-      .eq('id', supabaseUser.id)
-      .single();
-    
-    if (error) {
-      // If profile not found in employees_view (e.g., new user or view not updated yet)
-      // Try to fetch from 'profiles' table directly or create a fallback profile
-      if (error.code === 'PGRST116' || error.message.includes('0 rows')) { // PGRST116 is "No rows found"
-        console.warn('User profile not found in employees_view. Attempting to fetch/create in profiles table.');
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', supabaseUser.id)
-          .single();
+  // Fetch user profile dari Supabase
+  const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
+    try {
+      const { data, error } = await supabase
+        .from('employees_view')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
 
-        if (profileError && profileError.code === 'PGRST116') {
-          // Profile still not found, create a basic one
-          console.log('Profile not found in profiles table, creating a new one.');
-          const { data: newProfile, error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              id: supabaseUser.id,
-              email: supabaseUser.email,
-              full_name: supabaseUser.user_metadata?.full_name || 'Nama Pengguna',
-              username: supabaseUser.user_metadata?.username || null,
-              role: supabaseUser.user_metadata?.role || 'karyawan',
-              status: 'Aktif'
-            })
-            .select()
-            .single();
+      if (error) throw error;
 
-          if (insertError) {
-            console.error("Failed to create fallback user profile:", insertError.message);
-            return null;
-          } else if (newProfile) {
-            console.log('Fallback profile created:', newProfile);
-            return {
-              id: newProfile.id,
-              name: newProfile.full_name,
-              username: newProfile.username,
-              email: newProfile.email,
-              role: newProfile.role,
-              phone: newProfile.phone,
-              address: newProfile.address,
-              status: newProfile.status,
-            };
-          }
-        } else if (profileData) {
-          // Profile found in profiles table, use it
-          console.log('Profile found in profiles table:', profileData);
-          return {
-            id: profileData.id,
-            name: profileData.full_name,
-            username: profileData.username,
-            email: profileData.email,
-            role: profileData.role,
-            phone: profileData.phone,
-            address: profileData.address,
-            status: profileData.status,
-          };
-        }
-      }
-      console.error("Error fetching user profile:", error.message);
-      return null;
-    }
-    
-    if (data) {
-      return {
+      const employeeProfile: Employee = {
         id: data.id,
         name: data.full_name,
         username: data.username,
@@ -97,74 +44,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         address: data.address,
         status: data.status,
       };
-    }
-    return null;
-  }, []);
 
+      setUser(employeeProfile);
+    } catch (err) {
+      console.error('[Auth] Failed to fetch user profile:', err);
+      setUser(null);
+    }
+  };
+
+  // Sign out
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+  };
+
+  // Initial session check on mount
   useEffect(() => {
-    let isMounted = true;
+    const initializeAuth = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase.auth.getSession();
+      const currentSession = data?.session ?? null;
+      setSession(currentSession);
 
-    async function initializeAuth() {
-      // 1. Ambil sesi saat ini secara eksplisit
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (isMounted) {
-        setSession(session);
-        if (session?.user) {
-          const profile = await fetchUserProfile(session.user);
-          setUser(profile);
-        } else {
-          setUser(null); // Ensure user is null if no session
-        }
-        // 2. Selesaikan loading setelah semua data awal didapatkan
-        setIsLoading(false);
+      if (currentSession?.user) {
+        await fetchUserProfile(currentSession.user);
       }
-    }
+
+      setIsLoading(false);
+    };
 
     initializeAuth();
 
-    // 3. Siapkan listener untuk perubahan di masa depan (login/logout)
-    const { data: { subscription } = {} } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!isMounted) return;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      setSession(newSession);
 
-        setSession(session);
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-        } else if (session?.user) {
-          const profile = await fetchUserProfile(session.user);
-          setUser(profile);
-        }
-        // Ensure isLoading is false after any auth state change
-        setIsLoading(false); 
+      if (newSession?.user) {
+        await fetchUserProfile(newSession.user);
+      } else {
+        setUser(null);
       }
-    );
+    });
 
     return () => {
-      isMounted = false;
-      if (subscription) {
-        subscription.unsubscribe();
-      }
+      subscription.unsubscribe();
     };
-  }, [fetchUserProfile]);
+  }, []);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  const value = {
-    session,
-    user,
-    isLoading,
-    signOut,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{ session, user, isLoading, signOut }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuthContext = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuthContext must be used within an AuthProvider');
   }
   return context;
