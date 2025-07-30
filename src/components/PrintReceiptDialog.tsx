@@ -145,8 +145,9 @@ export function PrintReceiptDialog({ open, onOpenChange, transaction, template }
     });
     const finalY = (doc as any).lastAutoTable.finalY;
     doc.setFontSize(12).setFont("helvetica", "bold").text("TOTAL:", 140, finalY + 17).text(new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.total), pageWidth - margin, finalY + 17, { align: 'right' });
-    const sanitizedCustomerName = transaction.customerName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    doc.save(`Invoice-${format(orderDate, 'yyyyMMdd')}-${sanitizedCustomerName}-${transaction.id}.pdf`);
+    
+    const filename = `MDIInvoice-${transaction.id}-${format(new Date(), 'yyyyMMdd-HHmmss')}.pdf`;
+    doc.save(filename);
   };
 
   const handlePrint = () => {

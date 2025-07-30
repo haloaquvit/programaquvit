@@ -1,19 +1,36 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import PageLoader from '@/components/PageLoader';
 
+const loginSchema = z.object({
+  identifier: z.string().min(1, { message: 'Username atau Email harus diisi.' }),
+  password: z.string().min(1, { message: 'Password harus diisi.' }),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const { settings, isLoading: settingsLoading } = useCompanySettings();
   const { session, isLoading: authLoading } = useAuth();
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+  });
 
   useEffect(() => {
     if (session && !authLoading) {
@@ -21,17 +38,43 @@ export default function LoginPage() {
     }
   }, [session, authLoading, navigate]);
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        navigate('/', { replace: true });
+  const onSubmit = async (formData: LoginFormValues) => {
+    setLoginError(null);
+    let email = formData.identifier;
+
+    // Check if identifier is a username or email
+    const isEmail = formData.identifier.includes('@');
+
+    if (!isEmail) {
+      // It's a username, so we need to get the email from the profiles table
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('username', formData.identifier)
+        .single();
+
+      if (profileError || !profile) {
+        setLoginError('Username tidak ditemukan.');
+        return;
       }
+      email = profile.email!;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: formData.password,
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
+    if (error) {
+      if (error.message === 'Invalid login credentials') {
+        setLoginError('Kombinasi username/email dan password salah.');
+      } else {
+        setLoginError(error.message);
+      }
+    } else {
+      navigate('/', { replace: true });
+    }
+  };
 
   if (authLoading || session) {
     return <PageLoader />;
@@ -52,21 +95,38 @@ export default function LoginPage() {
           <CardDescription>Silakan masuk untuk melanjutkan</CardDescription>
         </CardHeader>
         <CardContent>
-          <Auth
-            supabaseClient={supabase}
-            appearance={{ theme: ThemeSupa }}
-            providers={[]}
-            showLinks={false}
-            localization={{
-              variables: {
-                sign_in: {
-                  email_label: 'Alamat Email',
-                  password_label: 'Password',
-                  button_label: 'Masuk',
-                },
-              },
-            }}
-          />
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {loginError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Login Gagal</AlertTitle>
+                <AlertDescription>{loginError}</AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="identifier">Username atau Email</Label>
+              <Input
+                id="identifier"
+                placeholder="contoh: user_anda atau user@email.com"
+                {...register('identifier')}
+                autoComplete="username"
+              />
+              {errors.identifier && <p className="text-sm text-destructive">{errors.identifier.message}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                {...register('password')}
+                autoComplete="current-password"
+              />
+              {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+            </div>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? 'Memproses...' : 'Masuk'}
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>

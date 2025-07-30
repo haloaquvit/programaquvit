@@ -130,8 +130,7 @@ export function PrintQuotationDialog({ open, onOpenChange, quotation }: PrintQuo
     const finalY = (doc as any).lastAutoTable.finalY;
     doc.setFontSize(12).setFont("helvetica", "bold").text("TOTAL PENAWARAN:", 140, finalY + 17).text(new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(quotation.total), 200, finalY + 17, { align: 'right' });
 
-    const sanitizedCustomerName = quotation.customerName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const filename = `Penawaran-${format(createdAt, 'yyyyMMdd')}-${sanitizedCustomerName}-${quotation.id}.pdf`;
+    const filename = `MDIPenawaran-${quotation.id}-${format(new Date(), 'yyyyMMdd-HHmmss')}.pdf`;
     doc.save(filename);
   };
 

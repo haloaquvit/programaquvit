@@ -171,7 +171,7 @@ export function FinancialReport() {
       headStyles: { fillColor: [240, 240, 240], textColor: [50, 50, 50], fontStyle: 'bold' },
     });
 
-    doc.save(`laporan-keuangan-${format(new Date(), "yyyy-MM-dd")}.pdf`)
+    doc.save(`MDILaporanKeuangan-${format(new Date(), "yyyyMMdd-HHmmss")}.pdf`)
   }
 
   const generateKasKecilPdf = () => {
@@ -213,7 +213,7 @@ export function FinancialReport() {
       }
     });
 
-    doc.save(`laporan-kas-kecil-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+    doc.save(`MDILaporanKasKecil-${format(new Date(), "yyyyMMdd-HHmmss")}.pdf`);
   };
 
   return (
