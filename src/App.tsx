@@ -2,11 +2,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Layout } from "@/components/layout/Layout";
-import ProtectedRoute from "@/components/ProtectedRoute"; // Updated import
-import ErrorBoundary from "@/components/ErrorBoundary";
-import NetworkErrorBoundary from "@/components/NetworkErrorBoundary";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import { Suspense, lazy } from "react";
 import PageLoader from "@/components/PageLoader";
+import { useChunkErrorHandler } from "@/hooks/useChunkErrorHandler";
 
 // Lazy load all pages
 const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
@@ -36,51 +35,50 @@ const AttendancePage = lazy(() => import("@/pages/AttendancePage"));
 const AttendanceReportPage = lazy(() => import("@/pages/AttendanceReportPage"));
 
 function App() {
-  return (
-    <ErrorBoundary>
-      <NetworkErrorBoundary>
-        <ThemeProvider attribute="class" defaultTheme="system" storageKey="vite-ui-theme">
-          <AuthProvider>
-            <BrowserRouter>
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  <Route path="/login" element={<LoginPage />} />
-                  
-                  {/* Protected routes wrapped by ProtectedRoute component */}
-                  <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-                    <Route path="/" element={<DashboardPage />} />
-                    <Route path="/pos" element={<PosPage />} />
-                    <Route path="/transactions" element={<TransactionListPage />} />
-                    <Route path="/transactions/:id" element={<TransactionDetailPage />} />
-                    <Route path="/quotations" element={<QuotationListPage />} />
-                    <Route path="/quotations/new" element={<NewQuotationPage />} />
-                    <Route path="/quotations/:id" element={<QuotationDetailPage />} />
-                    <Route path="/products" element={<ProductPage />} />
-                    <Route path="/materials" element={<MaterialPage />} />
-                    <Route path="/customers" element={<CustomerPage />} />
-                    <Route path="/customers/:id" element={<CustomerDetailPage />} />
-                    <Route path="/employees" element={<EmployeePage />} />
-                    <Route path="/purchase-orders" element={<PurchaseOrderPage />} />
-                    <Route path="/accounts" element={<AccountingPage />} />
-                    <Route path="/accounts/:id" element={<AccountDetailPage />} />
-                    <Route path="/receivables" element={<ReceivablesPage />} />
-                    <Route path="/expenses" element={<ExpensePage />} />
-                    <Route path="/advances" element={<EmployeeAdvancePage />} />
-                    <Route path="/financial-report" element={<FinancialReportPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/account-settings" element={<AccountSettingsPage />} />
-                    <Route path="/attendance" element={<AttendancePage />} />
-                    <Route path="/attendance/report" element={<AttendanceReportPage />} />
-                  </Route>
+  // Handle chunk loading errors
+  useChunkErrorHandler();
 
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-            </BrowserRouter>
-          </AuthProvider>
-        </ThemeProvider>
-      </NetworkErrorBoundary>
-    </ErrorBoundary>
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" storageKey="vite-ui-theme">
+      <AuthProvider>
+        <BrowserRouter>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              
+              {/* Protected routes wrapped by ProtectedRoute component */}
+              <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/pos" element={<PosPage />} />
+                <Route path="/transactions" element={<TransactionListPage />} />
+                <Route path="/transactions/:id" element={<TransactionDetailPage />} />
+                <Route path="/quotations" element={<QuotationListPage />} />
+                <Route path="/quotations/new" element={<NewQuotationPage />} />
+                <Route path="/quotations/:id" element={<QuotationDetailPage />} />
+                <Route path="/products" element={<ProductPage />} />
+                <Route path="/materials" element={<MaterialPage />} />
+                <Route path="/customers" element={<CustomerPage />} />
+                <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                <Route path="/employees" element={<EmployeePage />} />
+                <Route path="/purchase-orders" element={<PurchaseOrderPage />} />
+                <Route path="/accounts" element={<AccountingPage />} />
+                <Route path="/accounts/:id" element={<AccountDetailPage />} />
+                <Route path="/receivables" element={<ReceivablesPage />} />
+                <Route path="/expenses" element={<ExpensePage />} />
+                <Route path="/advances" element={<EmployeeAdvancePage />} />
+                <Route path="/financial-report" element={<FinancialReportPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/account-settings" element={<AccountSettingsPage />} />
+                <Route path="/attendance" element={<AttendancePage />} />
+                <Route path="/attendance/report" element={<AttendanceReportPage />} />
+              </Route>
+
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
