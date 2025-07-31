@@ -47,7 +47,7 @@ export const ProductManagement = ({ materials = [] }: ProductManagementProps) =>
   const [formData, setFormData] = useState(EMPTY_FORM_DATA)
   const { user } = useAuth()
 
-  const canManageProducts = user && ['admin', 'owner', 'supervisor'].includes(user.role)
+  const canManageProducts = user && ['admin', 'owner', 'supervisor', 'cashier'].includes(user.role)
 
   const handleEditClick = (product: Product) => {
     setEditingProduct(product)

@@ -32,6 +32,8 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  const [isLoading, setIsLoading] = useState(false);
+
   useEffect(() => {
     if (session && !authLoading) {
       navigate('/', { replace: true });
@@ -40,43 +42,53 @@ export default function LoginPage() {
 
   const onSubmit = async (formData: LoginFormValues) => {
     setLoginError(null);
-    let email = formData.identifier;
+    setIsLoading(true);
+    
+    try {
+      let email = formData.identifier;
 
-    // Check if identifier is a username or email
-    const isEmail = formData.identifier.includes('@');
+      // Check if identifier is a username or email
+      const isEmail = formData.identifier.includes('@');
 
-    if (!isEmail) {
-      // It's a username, so we need to get the email from the profiles table
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('username', formData.identifier)
-        .single();
+      if (!isEmail) {
+        // It's a username, so we need to get the email from the profiles table
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('username', formData.identifier)
+          .single();
 
-      if (profileError || !profile) {
-        setLoginError('Username tidak ditemukan.');
-        return;
+        if (profileError || !profile) {
+          setLoginError('Username tidak ditemukan.');
+          return;
+        }
+        email = profile.email!;
       }
-      email = profile.email!;
-    }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: formData.password,
-    });
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: formData.password,
+      });
 
-    if (error) {
-      if (error.message === 'Invalid login credentials') {
-        setLoginError('Kombinasi username/email dan password salah.');
+      if (error) {
+        if (error.message === 'Invalid login credentials') {
+          setLoginError('Kombinasi username/email dan password salah.');
+        } else {
+          setLoginError(error.message);
+        }
       } else {
-        setLoginError(error.message);
+        navigate('/', { replace: true });
       }
-    } else {
-      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('Login error:', error);
+      setLoginError('Terjadi kesalahan saat login. Silakan coba lagi.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (authLoading || session) {
+  // Show loading only if auth is still loading and we have a session
+  if (authLoading && session) {
     return <PageLoader />;
   }
 
@@ -87,7 +99,15 @@ export default function LoginPage() {
           {settingsLoading ? (
             <Skeleton className="mx-auto h-16 w-32" />
           ) : settings?.logo ? (
-            <img src={settings.logo} alt="Company Logo" className="mx-auto h-16 object-contain" />
+            <img 
+              src={settings.logo} 
+              alt="Company Logo" 
+              className="mx-auto h-16 object-contain"
+              onError={(e) => {
+                console.error('Failed to load logo:', settings.logo);
+                e.currentTarget.style.display = 'none';
+              }}
+            />
           ) : (
             <Package className="mx-auto h-12 w-12 text-primary" />
           )}
@@ -107,6 +127,7 @@ export default function LoginPage() {
               <Label htmlFor="identifier">Username atau Email</Label>
               <Input
                 id="identifier"
+                name="identifier"
                 placeholder="contoh: user_anda atau user@email.com"
                 {...register('identifier')}
                 autoComplete="username"
@@ -117,14 +138,15 @@ export default function LoginPage() {
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
                 {...register('password')}
                 autoComplete="current-password"
               />
               {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? 'Memproses...' : 'Masuk'}
+            <Button type="submit" className="w-full" disabled={isSubmitting || isLoading}>
+              {isSubmitting || isLoading ? 'Memproses...' : 'Masuk'}
             </Button>
           </form>
         </CardContent>

@@ -26,16 +26,24 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
   // Fetch user profile dari Supabase
   const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
+      console.log('[AuthContext] Fetching profile for user:', supabaseUser.id);
+      
       const { data, error } = await supabase
         .from('employees_view') // atau 'profiles' kalau kamu pakai itu
         .select('*')
         .eq('id', supabaseUser.id)
         .single();
 
-      if (error || !data) {
+      if (error) {
         console.error('[AuthContext] Gagal ambil user profile:', error);
         setUser(null); // fallback agar tidak stuck
-        return; // Penting: keluar dari fungsi jika ada error atau data kosong
+        return;
+      }
+
+      if (!data) {
+        console.error('[AuthContext] User profile tidak ditemukan');
+        setUser(null);
+        return;
       }
 
       const employeeProfile: Employee = {
@@ -49,6 +57,7 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
         status: data.status,
       };
 
+      console.log('[AuthContext] Profile loaded:', employeeProfile);
       setUser(employeeProfile);
     } catch (err) {
       console.error('[AuthContext] Error fetch profile:', err);
@@ -73,10 +82,16 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
 
     const initializeAuth = async () => {
       try {
+        console.log('[AuthContext] Starting auth initialization...');
         setIsLoading(true);
+        
+        // Simple session check
         const { data, error } = await supabase.auth.getSession();
         
-        if (!isMounted) return;
+        if (!isMounted) {
+          console.log('[AuthContext] Component unmounted, stopping...');
+          return;
+        }
         
         if (error) {
           console.error('[AuthContext] Error getting session:', error);
@@ -87,11 +102,14 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
         }
 
         const currentSession = data?.session ?? null;
+        console.log('[AuthContext] Session found:', !!currentSession);
         setSession(currentSession);
 
         if (currentSession?.user) {
+          console.log('[AuthContext] User found, fetching profile...');
           await fetchUserProfile(currentSession.user);
         } else {
+          console.log('[AuthContext] No user found');
           setUser(null);
         }
       } catch (err) {
@@ -102,12 +120,26 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
         }
       } finally {
         if (isMounted) {
+          console.log('[AuthContext] Setting isLoading to false');
           setIsLoading(false);
         }
       }
     };
 
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (isLoading) {
+        console.warn('[AuthContext] Auth initialization timeout, forcing isLoading to false');
+        setIsLoading(false);
+      }
+    }, 5000); // 5 detik timeout
+
     initializeAuth();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
 
     const {
       data: { subscription },
@@ -136,6 +168,8 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
     console.log('[AuthContext] isLoading:', isLoading);
   }, [session, user, isLoading]);
 
+
+
   return (
     <AuthContext.Provider
       value={{ session, user, isLoading, signOut }}
@@ -145,10 +179,12 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
   );
 };
 
-export const useAuthContext = () => {
+const useAuthContext = () => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuthContext must be used within an AuthProvider');
   }
   return context;
 };
+
+export { useAuthContext };

@@ -41,7 +41,7 @@ function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" storageKey="vite-ui-theme">
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true }}>
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
