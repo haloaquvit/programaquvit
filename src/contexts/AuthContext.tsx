@@ -58,26 +58,53 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
 
   // Sign out
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setUser(null);
+    try {
+      await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+    } catch (error) {
+      console.error('[AuthContext] Error during sign out:', error);
+    }
   };
 
   // Initial session check on mount
   useEffect(() => {
-    const initializeAuth = async () => {
-      setIsLoading(true);
-      const { data, error } = await supabase.auth.getSession();
-      const currentSession = data?.session ?? null;
-      setSession(currentSession);
+    let isMounted = true;
 
-      if (currentSession?.user) {
-        await fetchUserProfile(currentSession.user);
-      } else {
-        setUser(null); // Pastikan user null jika tidak ada sesi
+    const initializeAuth = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (!isMounted) return;
+        
+        if (error) {
+          console.error('[AuthContext] Error getting session:', error);
+          setSession(null);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+
+        const currentSession = data?.session ?? null;
+        setSession(currentSession);
+
+        if (currentSession?.user) {
+          await fetchUserProfile(currentSession.user);
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('[AuthContext] Error during auth initialization:', err);
+        if (isMounted) {
+          setSession(null);
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-      
-      setIsLoading(false); // Pastikan isLoading selalu false setelah inisialisasi
     };
 
     initializeAuth();
@@ -85,6 +112,8 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      if (!isMounted) return;
+      
       setSession(newSession);
 
       if (newSession?.user) {
@@ -92,11 +121,10 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
       } else {
         setUser(null);
       }
-      // Tidak perlu setIsLoading(false) di sini karena initializeAuth sudah menanganinya
-      // dan onAuthStateChange tidak selalu berarti loading selesai, hanya perubahan state
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);

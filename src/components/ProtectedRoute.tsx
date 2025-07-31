@@ -11,16 +11,20 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   console.log('[ProtectedRoute] session:', session);
   console.log('[ProtectedRoute] isLoading:', isLoading);
 
+  // Handle loading state
   if (isLoading) {
     console.log('[ProtectedRoute] Waiting for auth...');
     return <PageLoader />;
   }
 
-  if (!user && !session) {
+  // Check if user is authenticated
+  const isAuthenticated = user && session;
+
+  if (!isAuthenticated) {
     console.warn('[ProtectedRoute] No user or session, redirecting to login...');
-    return <Navigate to="/login" replace />; // Added replace to prevent back button issues
+    return <Navigate to="/login" replace />;
   }
 
-  console.log('[ProtectedRoute] User:', user ? user.email : 'N/A', 'Session:', session ? 'Active' : 'Inactive');
+  console.log('[ProtectedRoute] User authenticated:', user ? user.email : 'N/A');
   return <>{children}</>;
 }

@@ -7,6 +7,8 @@ export default defineConfig(() => ({
   server: {
     host: "::",
     port: 8080,
+    // Add history API fallback for SPA routing
+    historyApiFallback: true,
   },
   plugins: [dyadComponentTagger(), react()],
   resolve: {
@@ -15,4 +17,15 @@ export default defineConfig(() => ({
     },
   },
   base: "/", // ✅ Penting agar routing tidak rusak saat refresh di Vercel
+  build: {
+    // Ensure proper chunk splitting
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          supabase: ['@supabase/supabase-js'],
+        },
+      },
+    },
+  },
 }));
