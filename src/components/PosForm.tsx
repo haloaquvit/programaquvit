@@ -5,15 +5,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { PlusCircle, Trash2, Search, UserPlus, Wallet, FileText } from 'lucide-react'
+import { PlusCircle, Trash2, Search, UserPlus, Wallet, FileText, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { useToast } from '@/components/ui/use-toast'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { Textarea } from './ui/textarea'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Badge } from '@/components/ui/badge'
 import { useProducts } from '@/hooks/useProducts'
 import { useUsers } from '@/hooks/useUsers'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
+import { usePermissions } from '@/hooks/usePermissions'
 import { Product } from '@/types/product'
 import { Customer } from '@/types/customer'
 import { Transaction, TransactionItem, PaymentStatus } from '@/types/transaction'
@@ -36,6 +40,16 @@ interface FormTransactionItem {
   designFileName?: string;
 }
 
+type TransactionStatus = 'Pesanan Masuk' | 'Proses Design' | 'ACC Customer' | 'Produksi' | 'Pesanan Selesai';
+
+const STATUS_WORKFLOW: TransactionStatus[] = [
+  'Pesanan Masuk',
+  'Proses Design', 
+  'ACC Customer',
+  'Produksi',
+  'Pesanan Selesai'
+];
+
 export const PosForm = () => {
   const { toast } = useToast()
   const navigate = useNavigate()
@@ -46,6 +60,7 @@ export const PosForm = () => {
   const { accounts, updateAccountBalance } = useAccounts();
   const { addTransaction } = useTransactions();
   const { customers } = useCustomers();
+  const { hasPermission } = usePermissions();
   
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [orderDate, setOrderDate] = useState<Date | undefined>(new Date())
@@ -61,7 +76,9 @@ export const PosForm = () => {
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false)
   const [savedTransaction, setSavedTransaction] = useState<Transaction | null>(null)
   const [sourceQuotationId, setSourceQuotationId] = useState<string | null>(null)
-  const [isQuotationProcessed, setIsQuotationProcessed] = useState(false);
+  const [isQuotationProcessed, setIsQuotationProcessed] = useState(false)
+  const [currentStatus, setCurrentStatus] = useState<TransactionStatus>('Pesanan Masuk')
+  const [openProductSearches, setOpenProductSearches] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     const quotationData = location.state?.quotationData as Quotation | undefined;
@@ -97,6 +114,10 @@ export const PosForm = () => {
   }, [totalTagihan]);
 
   const handleAddItem = () => {
+    if (!hasPermission('transactions', 'add')) {
+      toast({ variant: "destructive", title: "Akses Ditolak", description: "Anda tidak memiliki izin untuk menambah transaksi." });
+      return;
+    }
     const newItem: FormTransactionItem = {
       id: Date.now(), product: null, keterangan: '', qty: 1, harga: 0, unit: 'pcs'
     };
@@ -117,7 +138,61 @@ export const PosForm = () => {
   };
 
   const handleRemoveItem = (index: number) => {
+    if (!hasPermission('transactions', 'delete')) {
+      toast({ variant: "destructive", title: "Akses Ditolak", description: "Anda tidak memiliki izin untuk menghapus item." });
+      return;
+    }
     setItems(items.filter((_, i) => i !== index));
+  };
+
+  const toggleProductSearch = (itemId: number) => {
+    const newOpen = new Set(openProductSearches);
+    if (newOpen.has(itemId)) {
+      newOpen.delete(itemId);
+    } else {
+      newOpen.add(itemId);
+    }
+    setOpenProductSearches(newOpen);
+  };
+
+  const canProgressToStatus = (targetStatus: TransactionStatus): boolean => {
+    const currentIndex = STATUS_WORKFLOW.indexOf(currentStatus);
+    const targetIndex = STATUS_WORKFLOW.indexOf(targetStatus);
+    
+    // Can only progress to next status or stay in current status
+    return targetIndex <= currentIndex + 1;
+  };
+
+  const getStatusColor = (status: TransactionStatus): string => {
+    const currentIndex = STATUS_WORKFLOW.indexOf(currentStatus);
+    const statusIndex = STATUS_WORKFLOW.indexOf(status);
+    
+    if (statusIndex < currentIndex) return 'bg-green-100 text-green-800';
+    if (statusIndex === currentIndex) return 'bg-blue-100 text-blue-800';
+    if (statusIndex === currentIndex + 1) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-gray-100 text-gray-500';
+  };
+
+  const handleStatusChange = (newStatus: TransactionStatus) => {
+    if (!canProgressToStatus(newStatus)) {
+      toast({
+        variant: "destructive",
+        title: "Status Tidak Valid",
+        description: `Tidak dapat beralih ke ${newStatus}. Selesaikan tahap sebelumnya terlebih dahulu.`
+      });
+      return;
+    }
+    
+    // Show warning for production cancellation
+    if (currentStatus === 'Produksi' && newStatus !== 'Pesanan Selesai') {
+      toast({
+        title: "Peringatan",
+        description: "Membatalkan dari tahap produksi akan mengurangi stok bahan. Pastikan untuk menyesuaikan inventori.",
+        variant: "destructive"
+      });
+    }
+    
+    setCurrentStatus(newStatus);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -161,7 +236,7 @@ export const PosForm = () => {
       total: totalTagihan,
       paidAmount: paidAmount,
       paymentStatus: paymentStatus,
-      status: 'Pesanan Masuk',
+      status: currentStatus,
     };
 
     addTransaction.mutate({ newTransaction, quotationId: sourceQuotationId }, {
@@ -180,6 +255,7 @@ export const PosForm = () => {
         setPaidAmount(0);
         setPaymentAccountId('');
         setSourceQuotationId(null);
+        setCurrentStatus('Pesanan Masuk');
       },
       onError: (error) => {
         toast({ variant: "destructive", title: "Gagal Menyimpan", description: error.message });
@@ -223,11 +299,41 @@ export const PosForm = () => {
           </div>
 
           <div className="space-y-4">
-            <div className="border rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center"><div className="w-2/5 text-sm font-semibold p-2 flex items-center justify-center shrink-0">Tgl Order</div><DateTimePicker date={orderDate} setDate={setOrderDate} /></div>
-              <div className="flex items-center"><div className="w-2/5 text-sm font-semibold p-2 flex items-center justify-center shrink-0">Tgl Selesai</div><DateTimePicker date={finishDate} setDate={setFinishDate} /></div>
-              <div className="flex items-center"><div className="w-2/5 text-sm font-semibold p-2 flex items-center justify-center shrink-0">Desainer</div><Select value={designerId} onValueChange={setDesignerId}><SelectTrigger className="w-3/5 h-9"><SelectValue placeholder="Pilih Desainer" /></SelectTrigger><SelectContent>{designers?.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent></Select></div>
-              <div className="flex items-center"><div className="w-2/5 text-sm font-semibold p-2 flex items-center justify-center shrink-0">Operator</div><Select value={operatorId} onValueChange={setOperatorId}><SelectTrigger className="w-3/5 h-9"><SelectValue placeholder="Pilih Operator" /></SelectTrigger><SelectContent>{operators?.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent></Select></div>
+            <div className="border rounded-lg p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center"><div className="w-2/5 text-sm font-semibold p-2 flex items-center justify-center shrink-0">Tgl Order</div><DateTimePicker date={orderDate} setDate={setOrderDate} /></div>
+                <div className="flex items-center"><div className="w-2/5 text-sm font-semibold p-2 flex items-center justify-center shrink-0">Tgl Selesai</div><DateTimePicker date={finishDate} setDate={setFinishDate} /></div>
+                <div className="flex items-center"><div className="w-2/5 text-sm font-semibold p-2 flex items-center justify-center shrink-0">Desainer</div><Select value={designerId} onValueChange={setDesignerId}><SelectTrigger className="w-3/5 h-9"><SelectValue placeholder="Pilih Desainer" /></SelectTrigger><SelectContent>{designers?.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent></Select></div>
+                <div className="flex items-center"><div className="w-2/5 text-sm font-semibold p-2 flex items-center justify-center shrink-0">Operator</div><Select value={operatorId} onValueChange={setOperatorId}><SelectTrigger className="w-3/5 h-9"><SelectValue placeholder="Pilih Operator" /></SelectTrigger><SelectContent>{operators?.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent></Select></div>
+              </div>
+              
+              <div className="border-t pt-4">
+                <Label className="text-sm font-semibold mb-2 block">Status Pesanan</Label>
+                <div className="flex flex-wrap gap-2">
+                  {STATUS_WORKFLOW.map((status) => {
+                    const isClickable = canProgressToStatus(status);
+                    const isCurrent = status === currentStatus;
+                    return (
+                      <Badge
+                        key={status}
+                        variant={isCurrent ? "default" : "secondary"}
+                        className={`cursor-pointer transition-all ${
+                          isClickable ? getStatusColor(status) + " hover:opacity-80" : "opacity-50 cursor-not-allowed"
+                        } ${isCurrent ? "ring-2 ring-blue-500" : ""}`}
+                        onClick={() => isClickable && handleStatusChange(status)}
+                      >
+                        {status}
+                        {status === 'ACC Customer' && currentStatus === 'Pesanan Masuk' && (
+                          <AlertTriangle className="ml-1 h-3 w-3" />
+                        )}
+                      </Badge>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Status dapat diubah secara berurutan. Status saat ini: <strong>{currentStatus}</strong>
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -238,19 +344,95 @@ export const PosForm = () => {
             <TableBody>
               {items.map((item, index) => (
                 <TableRow key={item.id}>
-                  <TableCell className="min-w-[200px]"><Select onValueChange={(v) => handleItemChange(index, 'product', products?.find(p => p.id === v))} value={item.product?.id}><SelectTrigger><SelectValue placeholder="Pilih Produk" /></SelectTrigger><SelectContent>{isLoadingProducts ? <SelectItem value="loading" disabled>Memuat...</SelectItem> : products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></TableCell>
+                  <TableCell className="min-w-[200px]">
+                    <Popover open={openProductSearches.has(item.id)} onOpenChange={(open) => {
+                      if (!open) {
+                        setOpenProductSearches(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(item.id);
+                          return newSet;
+                        });
+                      }
+                    }}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openProductSearches.has(item.id)}
+                          className="justify-between w-full h-auto min-h-[36px] text-left"
+                          onClick={() => toggleProductSearch(item.id)}
+                        >
+                          <span className="truncate">
+                            {item.product ? item.product.name : "Cari produk..."}
+                          </span>
+                          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Ketik nama produk..." />
+                          <CommandList>
+                            <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+                            <CommandGroup>
+                              {products?.map((product) => (
+                                <CommandItem
+                                  key={product.id}
+                                  value={product.name}
+                                  onSelect={() => {
+                                    handleItemChange(index, 'product', product);
+                                    setOpenProductSearches(prev => {
+                                      const newSet = new Set(prev);
+                                      newSet.delete(item.id);
+                                      return newSet;
+                                    });
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{product.name}</span>
+                                    <span className="text-sm text-muted-foreground">
+                                      {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(product.basePrice || 0)}
+                                      {product.unit && ` / ${product.unit}`}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </TableCell>
                   <TableCell className="min-w-[200px]"><Input value={item.keterangan} onChange={(e) => handleItemChange(index, 'keterangan', e.target.value)} placeholder="Detail, ukuran, dll." /></TableCell>
                   <TableCell className="min-w-[80px]"><Input type="number" value={item.qty} onChange={(e) => handleItemChange(index, 'qty', Number(e.target.value))} /></TableCell>
                   <TableCell className="min-w-[120px]"><Input value={item.unit} onChange={(e) => handleItemChange(index, 'unit', e.target.value)} placeholder="pcs, m², etc" /></TableCell>
                   <TableCell className="min-w-[150px]"><Input type="number" value={item.harga} onChange={(e) => handleItemChange(index, 'harga', Number(e.target.value))} /></TableCell>
                   <TableCell className="font-medium text-right">{new Intl.NumberFormat("id-ID").format(item.qty * item.harga)}</TableCell>
-                  <TableCell><Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                  <TableCell>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => handleRemoveItem(index)}
+                      disabled={!hasPermission('transactions', 'delete')}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
-        <Button type="button" onClick={handleAddItem} variant="outline" className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Tambah Item</Button>
+        <Button 
+          type="button" 
+          onClick={handleAddItem} 
+          variant="outline" 
+          className="w-full"
+          disabled={!hasPermission('transactions', 'add')}
+        >
+          <PlusCircle className="mr-2 h-4 w-4" /> Tambah Item
+        </Button>
 
         <div className="flex justify-between items-end gap-4 pt-6 border-t">
           <div className="flex gap-4">
@@ -268,7 +450,11 @@ export const PosForm = () => {
             <div className="space-y-1"><Label className="text-xs text-muted-foreground">Total Tagihan</Label><Input value={new Intl.NumberFormat("id-ID").format(totalTagihan)} readOnly className="w-32 font-semibold text-right bg-muted" /></div>
             <div className="space-y-1"><Label htmlFor="paidAmount" className="text-xs text-muted-foreground">Jumlah Bayar</Label><Input id="paidAmount" type="number" value={paidAmount} onChange={e => setPaidAmount(Number(e.target.value))} className="w-32 text-right font-bold" /></div>
             <div className="space-y-1"><Label className="text-xs text-muted-foreground">Sisa</Label><Input value={new Intl.NumberFormat("id-ID").format(sisaTagihan)} readOnly className="w-32 font-semibold text-right bg-destructive/20 text-destructive" /></div>
-            <Button type="submit" size="lg" disabled={addTransaction.isPending}>
+            <Button 
+              type="submit" 
+              size="lg" 
+              disabled={addTransaction.isPending || !hasPermission('transactions', 'add')}
+            >
               {addTransaction.isPending ? "Menyimpan..." : "Simpan Transaksi"}
             </Button>
           </div>

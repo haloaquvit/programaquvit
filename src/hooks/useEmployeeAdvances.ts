@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { EmployeeAdvance, AdvanceRepayment } from '@/types/employeeAdvance'
 import { useAccounts } from './useAccounts';
 import { supabase } from '@/integrations/supabase/client';
+import { useMemo } from 'react';
 
 const fromDbToApp = (dbAdvance: any): EmployeeAdvance => ({
   id: dbAdvance.id,
@@ -68,7 +69,6 @@ export const useEmployeeAdvances = () => {
 
       if (error) throw new Error(error.message);
       
-      updateAccountBalance.mutate({ accountId: newData.accountId, amount: -newData.amount });
       return fromDbToApp({ ...data, advance_repayments: [] });
     },
     onSuccess: () => {
@@ -108,9 +108,6 @@ export const useEmployeeAdvances = () => {
       // Then delete the advance itself
       const { error } = await supabase.from('employee_advances').delete().eq('id', advanceToDelete.id);
       if (error) throw new Error(error.message);
-
-      // Reimburse the account with the original amount
-      updateAccountBalance.mutate({ accountId: advanceToDelete.accountId, amount: advanceToDelete.amount });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employeeAdvances'] });
@@ -118,8 +115,41 @@ export const useEmployeeAdvances = () => {
     }
   });
 
+  // Group advances by employee
+  const advancesByEmployee = useMemo(() => {
+    if (!advances) return [];
+    
+    const grouped = advances.reduce((acc, advance) => {
+      const employeeId = advance.employeeId;
+      if (!acc[employeeId]) {
+        acc[employeeId] = {
+          employeeId,
+          employeeName: advance.employeeName,
+          advances: [],
+          totalAmount: 0,
+          totalRemaining: 0,
+        };
+      }
+      
+      acc[employeeId].advances.push(advance);
+      acc[employeeId].totalAmount += advance.amount;
+      acc[employeeId].totalRemaining += advance.remainingAmount;
+      
+      return acc;
+    }, {} as Record<string, {
+      employeeId: string;
+      employeeName: string;
+      advances: EmployeeAdvance[];
+      totalAmount: number;
+      totalRemaining: number;
+    }>);
+    
+    return Object.values(grouped).sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+  }, [advances]);
+
   return {
     advances,
+    advancesByEmployee,
     isLoading,
     isError,
     error,

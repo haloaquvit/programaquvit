@@ -16,6 +16,7 @@ import autoTable from "jspdf-autotable"
 import { useAccounts } from "@/hooks/useAccounts"
 import { useEmployeeAdvances } from "@/hooks/useEmployeeAdvances"
 import { useCompanySettings } from "@/hooks/useCompanySettings"
+import { KasKecilDebugReport } from "@/components/KasKecilDebugReport"
 
 export function FinancialReport() {
   const { transactions } = useTransactions()
@@ -55,31 +56,33 @@ export function FinancialReport() {
 
   const accountBalancesAtDate = useMemo(() => {
     if (!accounts || !transactions || !expenses || !advances || !dateRange?.to) {
-      return [];
+      return accounts || [];
     }
 
     const endDate = dateRange.to;
 
     return accounts.map(account => {
-      let balanceAtDate = account.balance;
+      // Mulai dari saldo saat ini
+      let currentBalance = account.balance;
 
+      // Kurangi semua pemasukan yang terjadi setelah tanggal akhir periode
       const incomeAfterPeriod = transactions
         .filter(t => new Date(t.orderDate) > endDate && t.paymentAccountId === account.id)
         .reduce((sum, t) => sum + t.paidAmount, 0);
       
-      balanceAtDate -= incomeAfterPeriod;
-
+      // Tambahkan kembali semua pengeluaran yang terjadi setelah tanggal akhir periode  
       const expensesAfterPeriod = expenses
         .filter(e => new Date(e.date) > endDate && e.accountId === account.id)
         .reduce((sum, e) => sum + e.amount, 0);
 
-      balanceAtDate += expensesAfterPeriod;
-
+      // Tambahkan kembali semua panjar yang terjadi setelah tanggal akhir periode
       const advancesAfterPeriod = advances
         .filter(a => new Date(a.date) > endDate && a.accountId === account.id)
         .reduce((sum, a) => sum + a.amount, 0);
-      
-      balanceAtDate += advancesAfterPeriod;
+
+      // Hitung saldo pada akhir periode yang dipilih
+      // Current Balance - Income After + Expenses After + Advances After = Balance at Date
+      const balanceAtDate = currentBalance - incomeAfterPeriod + expensesAfterPeriod + advancesAfterPeriod;
 
       return {
         ...account,
@@ -92,24 +95,64 @@ export function FinancialReport() {
     const kasKecilAccount = accounts?.find(a => a.name.toLowerCase() === 'kas kecil');
     if (!kasKecilAccount || !transactions || !expenses || !advances) return null;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = addDays(today, 1);
+    const from = dateRange?.from || startOfDay(new Date());
+    const to = dateRange?.to || endOfDay(new Date());
 
-    const isToday = (date: Date) => new Date(date) >= today && new Date(date) < tomorrow;
+    const isInDateRange = (date: Date) => new Date(date) >= from && new Date(date) <= to;
+    const isBeforePeriod = (date: Date) => new Date(date) < from;
+    const isAfterPeriod = (date: Date) => new Date(date) > to;
 
-    const incomeToKasKecil = transactions.filter(t => t.paymentAccountId === kasKecilAccount.id && isToday(t.orderDate)).reduce((sum, t) => sum + t.total, 0);
-    const expenseFromKasKecil = expenses.filter(e => e.accountId === kasKecilAccount.id && isToday(e.date)).reduce((sum, e) => sum + e.amount, 0);
-    const advancesFromKasKecil = advances.filter(a => a.accountId === kasKecilAccount.id && isToday(a.date)).reduce((sum, a) => sum + a.amount, 0);
+    // Pemasukan dalam periode (gunakan paidAmount, bukan total)
+    const incomeInPeriod = transactions
+      .filter(t => t.paymentAccountId === kasKecilAccount.id && isInDateRange(t.orderDate))
+      .reduce((sum, t) => sum + t.paidAmount, 0);
+
+    // Pengeluaran dalam periode  
+    const expenseInPeriod = expenses
+      .filter(e => e.accountId === kasKecilAccount.id && isInDateRange(e.date))
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // Panjar dalam periode
+    const advancesInPeriod = advances
+      .filter(a => a.accountId === kasKecilAccount.id && isInDateRange(a.date))
+      .reduce((sum, a) => sum + a.amount, 0);
+
+    // Hitung saldo awal dengan cara yang benar
+    // Saldo sekarang dikurangi semua transaksi setelah periode
+    const currentBalance = kasKecilAccount.balance;
     
-    const totalDailyIncome = incomeToKasKecil;
-    const totalDailyExpense = expenseFromKasKecil + advancesFromKasKecil;
+    // Kurangi pemasukan setelah periode
+    const incomeAfterPeriod = transactions
+      .filter(t => t.paymentAccountId === kasKecilAccount.id && isAfterPeriod(t.orderDate))
+      .reduce((sum, t) => sum + t.paidAmount, 0);
+    
+    // Tambahkan kembali pengeluaran setelah periode
+    const expenseAfterPeriod = expenses
+      .filter(e => e.accountId === kasKecilAccount.id && isAfterPeriod(e.date))
+      .reduce((sum, e) => sum + e.amount, 0);
+      
+    // Tambahkan kembali panjar setelah periode
+    const advancesAfterPeriod = advances
+      .filter(a => a.accountId === kasKecilAccount.id && isAfterPeriod(a.date))
+      .reduce((sum, a) => sum + a.amount, 0);
 
-    const openingBalance = kasKecilAccount.balance - totalDailyIncome + totalDailyExpense;
-    const closingBalance = openingBalance + totalDailyIncome - totalDailyExpense;
+    // Saldo di akhir periode = saldo sekarang - pemasukan setelah + pengeluaran setelah + panjar setelah
+    const balanceAtEndOfPeriod = currentBalance - incomeAfterPeriod + expenseAfterPeriod + advancesAfterPeriod;
+    
+    // Saldo awal periode = saldo akhir periode - pemasukan dalam periode + pengeluaran dalam periode
+    const openingBalance = balanceAtEndOfPeriod - incomeInPeriod + expenseInPeriod + advancesInPeriod;
+    
+    // Saldo akhir periode (should equal balanceAtEndOfPeriod)
+    const closingBalance = openingBalance + incomeInPeriod - expenseInPeriod - advancesInPeriod;
 
-    return { openingBalance, incomeToKasKecil, expenseFromKasKecil, advancesFromKasKecil, closingBalance };
-  }, [accounts, transactions, expenses, advances]);
+    return { 
+      openingBalance, 
+      incomeToKasKecil: incomeInPeriod, 
+      expenseFromKasKecil: expenseInPeriod, 
+      advancesFromKasKecil: advancesInPeriod, 
+      closingBalance 
+    };
+  }, [accounts, transactions, expenses, advances, dateRange]);
 
   const generatePdf = () => {
     const doc = new jsPDF()
@@ -178,53 +221,97 @@ export function FinancialReport() {
     if (!kasKecilReport) return;
 
     const doc = new jsPDF();
-    const today = format(new Date(), "d MMMM yyyy", { locale: id });
+    const reportDate = dateRange?.from ? format(dateRange.from, "d MMMM yyyy", { locale: id }) : format(new Date(), "d MMMM yyyy", { locale: id });
     const pageWidth = doc.internal.pageSize.width;
     const margin = 15;
 
     if (companyInfo?.logo) {
       try { doc.addImage(companyInfo.logo, 'PNG', margin, 12, 30, 12); } catch (e) { console.error(e); }
     }
-    doc.setFontSize(16).setFont("helvetica", "bold").text("Laporan Kas Kecil Harian", pageWidth - margin, 25, { align: 'right' });
+    doc.setFontSize(16).setFont("helvetica", "bold").text("Laporan Kas Harian", pageWidth - margin, 25, { align: 'right' });
     doc.setFontSize(9).setFont("helvetica", "normal").text(companyInfo?.name || '', margin, 30).text(companyInfo?.address || '', margin, 35);
-    doc.setFontSize(9).setFont("helvetica", "normal").text(`Tanggal: ${today}`, pageWidth - margin, 32, { align: 'right' });
+    doc.setFontSize(9).setFont("helvetica", "normal").text(`Tanggal: ${reportDate}`, pageWidth - margin, 32, { align: 'right' });
     doc.setDrawColor(200).line(margin, 45, pageWidth - margin, 45);
 
-    autoTable(doc, {
-      startY: 55,
-      head: [['Deskripsi', 'Jumlah']],
-      body: [
-        ['Saldo Awal', new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.openingBalance)],
-        ['Pemasukan Hari Ini', new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.incomeToKasKecil)],
-        ['Pengeluaran Kantor', new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.expenseFromKasKecil)],
-        ['Panjar Karyawan', new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.advancesFromKasKecil)],
-        ['Saldo Akhir', new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.closingBalance)],
-      ],
-      theme: 'striped',
-      headStyles: { fillColor: [240, 240, 240], textColor: [50, 50, 50], fontStyle: 'bold' },
-      bodyStyles: { fontStyle: 'bold' },
-      columnStyles: {
-        1: { halign: 'right' }
-      },
-      didParseCell: function (data) {
-        if (data.section === 'body' && data.row.index === 4) {
-          (data.cell.styles as any).fillColor = '#f1f5f9';
+    // Tambahkan informasi semua akun kas
+    const cashAccounts = accounts?.filter(acc => acc.type === 'Aset') || [];
+    
+    if (cashAccounts.length > 0) {
+      doc.setFontSize(12).setFont("helvetica", "bold").text("Ringkasan Kas Harian", margin, 55);
+      
+      autoTable(doc, {
+        startY: 60,
+        head: [['Akun', 'Saldo Awal', 'Pemasukan', 'Pengeluaran', 'Saldo Akhir']],
+        body: cashAccounts.map(account => {
+          const accountBalanceData = accountBalancesAtDate.find(acc => acc.id === account.id);
+          const filteredIncomeForAccount = filteredData.income.filter(t => t.paymentAccountId === account.id).reduce((sum, t) => sum + t.total, 0);
+          const filteredExpenseForAccount = filteredData.expense.filter(e => e.accountId === account.id).reduce((sum, e) => sum + e.amount, 0);
+          const filteredAdvancesForAccount = advances?.filter(a => a.accountId === account.id && dateRange?.from && dateRange?.to && new Date(a.date) >= dateRange.from && new Date(a.date) <= dateRange.to).reduce((sum, a) => sum + a.amount, 0) || 0;
+          
+          const openingBalance = (accountBalanceData?.balanceAtDate || account.balance) - filteredIncomeForAccount + filteredExpenseForAccount + filteredAdvancesForAccount;
+          const totalExpense = filteredExpenseForAccount + filteredAdvancesForAccount;
+          
+          return [
+            account.name,
+            new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(openingBalance),
+            new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(filteredIncomeForAccount),
+            new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(totalExpense),
+            new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(accountBalanceData?.balanceAtDate || account.balance)
+          ];
+        }),
+        theme: 'striped',
+        headStyles: { fillColor: [240, 240, 240], textColor: [50, 50, 50], fontStyle: 'bold' },
+        columnStyles: {
+          1: { halign: 'right' },
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+          4: { halign: 'right' }
         }
-      }
-    });
+      });
+    }
 
-    doc.save(`MDILaporanKasKecil-${format(new Date(), "yyyyMMdd-HHmmss")}.pdf`);
+    // Jika ada akun Kas Kecil, tambahkan detail seperti sebelumnya
+    if (kasKecilReport) {
+      doc.setFontSize(12).setFont("helvetica", "bold").text("Detail Kas Kecil", margin, (doc as any).lastAutoTable.finalY + 15);
+      
+      autoTable(doc, {
+        startY: (doc as any).lastAutoTable.finalY + 20,
+        head: [['Deskripsi', 'Jumlah']],
+        body: [
+          ['Saldo Awal', new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.openingBalance)],
+          ['Pemasukan', new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.incomeToKasKecil)],
+          ['Pengeluaran Kantor', new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.expenseFromKasKecil)],
+          ['Panjar Karyawan', new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.advancesFromKasKecil)],
+          ['Saldo Akhir', new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.closingBalance)],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [240, 240, 240], textColor: [50, 50, 50], fontStyle: 'bold' },
+        bodyStyles: { fontStyle: 'bold' },
+        columnStyles: {
+          1: { halign: 'right' }
+        },
+        didParseCell: function (data) {
+          if (data.section === 'body' && data.row.index === 4) {
+            (data.cell.styles as any).fillColor = '#f1f5f9';
+          }
+        }
+      });
+    }
+
+    doc.save(`MDILaporanKasHarian-${format(new Date(), "yyyyMMdd-HHmmss")}.pdf`);
   };
 
   return (
     <div className="space-y-6">
+      <KasKecilDebugReport />
+      
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <div><CardTitle>Laporan Keuangan</CardTitle><CardDescription>Analisis pendapatan, pengeluaran, dan laba bersih perusahaan.</CardDescription></div>
           <div className="flex items-center gap-2">
             <DateRangePicker date={dateRange} onDateChange={setDateRange} />
             <Button onClick={generatePdf}><Download className="mr-2 h-4 w-4" /> Unduh Laporan Keuangan</Button>
-            <Button onClick={generateKasKecilPdf} variant="outline" disabled={!kasKecilReport}><Download className="mr-2 h-4 w-4" /> Cetak Kas Kecil</Button>
+            <Button onClick={generateKasKecilPdf} variant="outline"><Download className="mr-2 h-4 w-4" /> Cetak Kas Harian</Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -244,8 +331,13 @@ export function FinancialReport() {
         kasKecilReport && (
           <Card>
             <CardHeader>
-              <CardTitle>Laporan Kas Kecil Harian</CardTitle>
-              <CardDescription>Ringkasan arus kas untuk akun Kas Kecil pada hari ini, {format(new Date(), "d MMMM yyyy", { locale: id })}.</CardDescription>
+              <CardTitle>Laporan Kas Kecil</CardTitle>
+              <CardDescription>
+                Ringkasan arus kas untuk akun Kas Kecil pada periode {dateRange?.from && dateRange?.to ? 
+                  `${format(dateRange.from, "d MMM yyyy", { locale: id })} - ${format(dateRange.to, "d MMM yyyy", { locale: id })}` : 
+                  format(new Date(), "d MMMM yyyy", { locale: id })
+                }.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-5">
               <div className="border p-4 rounded-lg"><p className="text-sm text-muted-foreground">Saldo Awal</p><p className="font-bold">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(kasKecilReport.openingBalance)}</p></div>
@@ -259,7 +351,7 @@ export function FinancialReport() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Laporan Kas Kecil Harian</CardTitle>
+            <CardTitle>Laporan Kas Kecil</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">

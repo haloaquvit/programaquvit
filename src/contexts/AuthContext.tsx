@@ -18,7 +18,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { ReactNode }) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +68,15 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
   // Sign out
   const signOut = async () => {
     try {
+      // Logout current session
+      const sessionToken = localStorage.getItem('session_token');
+      if (sessionToken) {
+        await supabase.rpc('logout_session', {
+          p_session_token: sessionToken
+        });
+        localStorage.removeItem('session_token');
+      }
+      
       await supabase.auth.signOut();
       setSession(null);
       setUser(null);
@@ -136,16 +145,13 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
 
     initializeAuth();
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-    };
-
+    // Setup auth state listener
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!isMounted) return;
       
+      console.log('[AuthContext] Auth state changed:', _event, !!newSession);
       setSession(newSession);
 
       if (newSession?.user) {
@@ -157,6 +163,7 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);

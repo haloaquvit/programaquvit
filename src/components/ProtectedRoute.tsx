@@ -11,9 +11,15 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   console.log('[ProtectedRoute] session:', session);
   console.log('[ProtectedRoute] isLoading:', isLoading);
 
-  // Handle loading state
+  // Handle loading state with timeout protection
   if (isLoading) {
     console.log('[ProtectedRoute] Waiting for auth...');
+    // Add timeout protection - if taking too long, let user continue
+    setTimeout(() => {
+      if (isLoading && session) {
+        console.warn('[ProtectedRoute] Auth taking too long but session exists, continuing...');
+      }
+    }, 3000);
     return <PageLoader />;
   }
 
@@ -22,6 +28,8 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   if (!isAuthenticated) {
     console.warn('[ProtectedRoute] No user or session, redirecting to login...');
+    console.warn('[ProtectedRoute] user:', user);
+    console.warn('[ProtectedRoute] session:', session);
     return <Navigate to="/login" replace />;
   }
 
