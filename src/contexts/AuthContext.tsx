@@ -68,14 +68,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Sign out
   const signOut = async () => {
     try {
-      // Logout current session
-      const sessionToken = localStorage.getItem('session_token');
-      if (sessionToken) {
-        await supabase.rpc('logout_session', {
-          p_session_token: sessionToken
-        });
-        localStorage.removeItem('session_token');
-      }
+      // Logout current session (disable for now due to DB issues)
+      // const sessionToken = localStorage.getItem('session_token');
+      // if (sessionToken) {
+      //   await supabase.rpc('logout_session', {
+      //     p_session_token: sessionToken
+      //   });
+      //   localStorage.removeItem('session_token');
+      // }
       
       await supabase.auth.signOut();
       setSession(null);
@@ -152,12 +152,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!isMounted) return;
       
       console.log('[AuthContext] Auth state changed:', _event, !!newSession);
-      setSession(newSession);
+      
+      // Only update if session actually changed to prevent loops
+      if (newSession !== session) {
+        setSession(newSession);
 
-      if (newSession?.user) {
-        await fetchUserProfile(newSession.user);
-      } else {
-        setUser(null);
+        if (newSession?.user) {
+          await fetchUserProfile(newSession.user);
+        } else {
+          setUser(null);
+        }
       }
     });
 
