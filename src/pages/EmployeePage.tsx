@@ -4,12 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, Edit, Trash2, KeyRound, HandCoins } from "lucide-react"
+import { UserPlus, Edit, Trash2, KeyRound } from "lucide-react"
 import { useEmployees } from "@/hooks/useEmployees"
 import { Employee } from "@/types/employee"
 import { EmployeeDialog } from "@/components/EmployeeDialog"
 import { ResetPasswordDialog } from "@/components/ResetPasswordDialog"
-import { AddAdvanceDialog } from "@/components/AddAdvanceDialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
@@ -28,7 +27,6 @@ import {
 export default function EmployeePage() {
   const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false)
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false)
-  const [isAdvanceDialogOpen, setIsAdvanceDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const { user } = useAuth()
   const { toast } = useToast()
@@ -43,11 +41,6 @@ export default function EmployeePage() {
   const handleOpenResetPasswordDialog = (employee: Employee) => {
     setSelectedEmployee(employee)
     setIsResetPasswordDialogOpen(true)
-  }
-
-  const handleOpenAdvanceDialog = (employee: Employee) => {
-    setSelectedEmployee(employee)
-    setIsAdvanceDialogOpen(true)
   }
 
   const handleDelete = (employeeToDelete: Employee) => {
@@ -88,11 +81,6 @@ export default function EmployeePage() {
         open={isResetPasswordDialogOpen}
         onOpenChange={setIsResetPasswordDialogOpen}
         employee={selectedEmployee}
-      />
-      <AddAdvanceDialog
-        open={isAdvanceDialogOpen}
-        onOpenChange={setIsAdvanceDialogOpen}
-        preSelectedEmployee={selectedEmployee}
       />
       <Card>
         <CardHeader>
@@ -141,9 +129,6 @@ export default function EmployeePage() {
                       <TableCell className="text-right">
                         {isOwner ? (
                           <>
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenAdvanceDialog(employee)} title="Tambah Panjar">
-                              <HandCoins className="h-4 w-4 text-green-600" />
-                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => handleOpenResetPasswordDialog(employee)} title="Reset Password">
                               <KeyRound className="h-4 w-4 text-muted-foreground" />
                             </Button>

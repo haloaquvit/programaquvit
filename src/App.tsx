@@ -3,7 +3,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Layout } from "@/components/layout/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { SessionManager } from "@/components/SessionManager";
 import { Suspense, lazy } from "react";
 import PageLoader from "@/components/PageLoader";
 import { useChunkErrorHandler } from "@/hooks/useChunkErrorHandler";
@@ -42,7 +41,6 @@ function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" storageKey="vite-ui-theme">
       <AuthProvider>
-        <SessionManager />
         <BrowserRouter future={{ v7_startTransition: true }}>
           <Suspense fallback={<PageLoader />}>
             <Routes>

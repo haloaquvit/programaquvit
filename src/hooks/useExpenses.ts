@@ -47,6 +47,10 @@ export const useExpenses = () => {
         .single();
       if (error) throw new Error(error.message);
       
+      // Kurangi saldo akun yang digunakan, jika ada
+      if (newExpenseData.accountId) {
+        updateAccountBalance.mutate({ accountId: newExpenseData.accountId, amount: -newExpenseData.amount });
+      }
       return fromDbToApp(data);
     },
     onSuccess: () => {
@@ -56,13 +60,24 @@ export const useExpenses = () => {
   });
 
   const deleteExpense = useMutation({
-    mutationFn: async (expenseId: string): Promise<void> => {
-      const { error: deleteError } = await supabase
+    mutationFn: async (expenseId: string): Promise<Expense> => {
+      const { data: deletedExpense, error: deleteError } = await supabase
         .from('expenses')
         .delete()
-        .eq('id', expenseId);
+        .eq('id', expenseId)
+        .select()
+        .single();
       
       if (deleteError) throw new Error(deleteError.message);
+      if (!deletedExpense) throw new Error("Pengeluaran tidak ditemukan");
+      
+      const appExpense = fromDbToApp(deletedExpense);
+      // Kembalikan saldo ke akun yang digunakan, jika ada
+      if (appExpense.accountId) {
+        updateAccountBalance.mutate({ accountId: appExpense.accountId, amount: appExpense.amount });
+      }
+      
+      return appExpense;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });

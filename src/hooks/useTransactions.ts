@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Transaction } from '@/types/transaction'
 import { supabase } from '@/integrations/supabase/client'
 import { useExpenses } from './useExpenses'
-import { useAccounts } from './useAccounts'
 
 // Helper to map from DB (snake_case) to App (camelCase)
 const fromDb = (dbTransaction: any): Transaction => ({
@@ -46,7 +45,6 @@ const toDb = (appTransaction: Partial<Omit<Transaction, 'createdAt'>>) => ({
 export const useTransactions = () => {
   const queryClient = useQueryClient()
   const { addExpense } = useExpenses()
-  const { updateAccountBalance } = useAccounts()
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ['transactions'],
@@ -89,17 +87,15 @@ export const useTransactions = () => {
   })
 
   const payReceivable = useMutation({
-    mutationFn: async ({ transactionId, amount, accountId }: { transactionId: string, amount: number, accountId?: string }): Promise<void> => {
+    mutationFn: async ({ transactionId, amount }: { transactionId: string, amount: number }): Promise<void> => {
       const { error } = await supabase.rpc('pay_receivable', {
         p_transaction_id: transactionId,
-        p_amount: amount,
-        p_account_id: accountId
+        p_amount: amount
       });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
     }
   });
 

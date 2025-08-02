@@ -1,5 +1,4 @@
 "use client"
-import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -16,9 +15,7 @@ import { AccountType } from "@/types/account"
 import { useNavigate } from "react-router-dom"
 import { Skeleton } from "./ui/skeleton"
 import { useAuth } from "@/hooks/useAuth"
-import { Trash2, ArrowRightLeft } from "lucide-react"
-import { CashTransferDialog } from "@/components/CashTransferDialog"
-import { CashTransferHistory } from "@/components/CashTransferHistory"
+import { Trash2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,7 +44,6 @@ export function AccountManagement() {
   const { toast } = useToast()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [transferDialogOpen, setTransferDialogOpen] = useState(false)
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
@@ -138,16 +134,8 @@ export function AccountManagement() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Daftar Akun</CardTitle>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setTransferDialogOpen(true)} variant="outline">
-              <ArrowRightLeft className="mr-2 h-4 w-4" />
-              Transfer Kas
-            </Button>
-          </div>
+        <CardHeader>
+          <CardTitle>Daftar Akun</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -210,13 +198,6 @@ export function AccountManagement() {
           </div>
         </CardContent>
       </Card>
-      
-      <CashTransferDialog 
-        open={transferDialogOpen} 
-        onOpenChange={setTransferDialogOpen} 
-      />
-      
-      <CashTransferHistory />
     </div>
   )
 }

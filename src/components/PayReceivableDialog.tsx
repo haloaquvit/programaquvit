@@ -43,13 +43,12 @@ export function PayReceivableDialog({ open, onOpenChange, transaction }: PayRece
       return;
     }
 
-    // Mutasi untuk membayar piutang (sudah termasuk update account balance)
-    payReceivable.mutate({ 
-      transactionId: transaction.id, 
-      amount: data.amount, 
-      accountId: data.paymentAccountId 
-    }, {
+    // Mutasi untuk membayar piutang
+    payReceivable.mutate({ transactionId: transaction.id, amount: data.amount }, {
       onSuccess: () => {
+        // Mutasi untuk menambah saldo akun
+        updateAccountBalance.mutate({ accountId: data.paymentAccountId, amount: data.amount });
+        
         toast({ title: "Sukses", description: "Pembayaran piutang berhasil dicatat." })
         reset()
         onOpenChange(false)
