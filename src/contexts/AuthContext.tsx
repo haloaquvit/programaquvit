@@ -137,7 +137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Add timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
-      if (isMounted) {
+      if (isLoading) {
         console.warn('[AuthContext] Auth initialization timeout, forcing isLoading to false');
         setIsLoading(false);
       }

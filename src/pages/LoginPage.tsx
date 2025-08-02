@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import PageLoader from '@/components/PageLoader';
 
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Format email tidak valid.' }).min(1, { message: 'Email harus diisi.' }),
+  identifier: z.string().min(1, { message: 'Username atau Email harus diisi.' }),
   password: z.string().min(1, { message: 'Password harus diisi.' }),
 });
 
@@ -45,14 +45,34 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
+      let email = formData.identifier;
+
+      // Check if identifier is a username or email
+      const isEmail = formData.identifier.includes('@');
+
+      if (!isEmail) {
+        // It's a username, so we need to get the email from the profiles table
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('username', formData.identifier)
+          .single();
+
+        if (profileError || !profile) {
+          setLoginError('Username tidak ditemukan.');
+          return;
+        }
+        email = profile.email!;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
+        email: email,
         password: formData.password,
       });
 
       if (error) {
         if (error.message === 'Invalid login credentials') {
-          setLoginError('Kombinasi email dan password salah.');
+          setLoginError('Kombinasi username/email dan password salah.');
         } else {
           setLoginError(error.message);
         }
@@ -92,7 +112,7 @@ export default function LoginPage() {
             <Package className="mx-auto h-12 w-12 text-primary" />
           )}
           <CardTitle className="text-2xl font-bold mt-4">{settings?.name || 'Matahari Digital Printing'}</CardTitle>
-          <CardDescription>Silakan masuk dengan email untuk melanjutkan</CardDescription>
+          <CardDescription>Silakan masuk untuk melanjutkan</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -104,16 +124,15 @@ export default function LoginPage() {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="identifier">Username atau Email</Label>
               <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="contoh: user@email.com"
-                {...register('email')}
-                autoComplete="email"
+                id="identifier"
+                name="identifier"
+                placeholder="contoh: user_anda atau user@email.com"
+                {...register('identifier')}
+                autoComplete="username"
               />
-              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+              {errors.identifier && <p className="text-sm text-destructive">{errors.identifier.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
