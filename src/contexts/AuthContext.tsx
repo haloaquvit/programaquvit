@@ -25,10 +25,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Fetch user profile dari Supabase
   const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
+    console.log('[AuthContext] Fetching profile for user:', supabaseUser.id);
+    
+    // ALWAYS create a basic profile immediately to unblock login
+    const basicProfile: Employee = {
+      id: supabaseUser.id,
+      name: supabaseUser.email?.split('@')[0] || 'User',
+      username: supabaseUser.email?.split('@')[0] || 'user',
+      email: supabaseUser.email || '',
+      role: 'owner', // Default to owner for full access
+      phone: '',
+      address: '',
+      status: 'active',
+    };
+    
+    console.log('[AuthContext] Setting basic profile immediately:', basicProfile);
+    setUser(basicProfile);
+    
+    // Try to get more details from database (optional, doesn't block login)
     try {
-      console.log('[AuthContext] Fetching profile for user:', supabaseUser.id);
-      
-      // Try profiles table first
       let { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -47,58 +62,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         error = result.error;
       }
 
-      if (error) {
-        console.error('[AuthContext] Both queries failed:', error);
-        // Create a basic user profile from Supabase auth data
-        const basicProfile: Employee = {
-          id: supabaseUser.id,
-          name: supabaseUser.email?.split('@')[0] || 'User',
-          username: supabaseUser.email?.split('@')[0] || 'user',
-          email: supabaseUser.email || '',
-          role: 'owner', // Default to owner for now
-          phone: '',
-          address: '',
-          status: 'active',
+      // If we got data from database, update the profile
+      if (!error && data) {
+        const enhancedProfile: Employee = {
+          id: data.id,
+          name: data.full_name || data.name || basicProfile.name,
+          username: data.username || basicProfile.username,
+          email: data.email || basicProfile.email,
+          role: data.role || basicProfile.role,
+          phone: data.phone || '',
+          address: data.address || '',
+          status: data.status || 'active',
         };
-        console.log('[AuthContext] Using basic profile:', basicProfile);
-        setUser(basicProfile);
-        return;
+        
+        console.log('[AuthContext] Enhanced profile from DB:', enhancedProfile);
+        setUser(enhancedProfile);
+      } else {
+        console.log('[AuthContext] Database query failed, keeping basic profile');
       }
-
-      if (!data) {
-        console.error('[AuthContext] User profile data is null');
-        setUser(null);
-        return;
-      }
-
-      const employeeProfile: Employee = {
-        id: data.id,
-        name: data.full_name || data.name || supabaseUser.email?.split('@')[0] || 'User',
-        username: data.username || supabaseUser.email?.split('@')[0] || 'user',
-        email: data.email || supabaseUser.email || '',
-        role: data.role || 'owner',
-        phone: data.phone || '',
-        address: data.address || '',
-        status: data.status || 'active',
-      };
-
-      console.log('[AuthContext] Profile loaded:', employeeProfile);
-      setUser(employeeProfile);
     } catch (err) {
-      console.error('[AuthContext] Error fetch profile:', err);
-      // Create fallback profile
-      const fallbackProfile: Employee = {
-        id: supabaseUser.id,
-        name: supabaseUser.email?.split('@')[0] || 'User',
-        username: supabaseUser.email?.split('@')[0] || 'user',
-        email: supabaseUser.email || '',
-        role: 'owner',
-        phone: '',
-        address: '',
-        status: 'active',
-      };
-      console.log('[AuthContext] Using fallback profile:', fallbackProfile);
-      setUser(fallbackProfile);
+      console.error('[AuthContext] Database error, keeping basic profile:', err);
+      // Basic profile is already set, so we're good
     }
   };
 
