@@ -120,25 +120,21 @@ export const usePermissions = () => {
 
   // Helper function to check permission
   const hasPermission = (featureName: string, action: 'add' | 'edit' | 'delete' | 'view'): boolean => {
-    // Always allow for now to unblock POS functionality
-    return true;
+    // Fallback to true if permissions are not loaded yet or user is owner
+    if (!user?.id) return false;
+    if (user.role === 'owner') return true;
+    if (!myPermissions || myPermissions.length === 0) return true; // Fallback for now
     
-    // TODO: Re-enable this when database permissions are properly set up
-    // // Fallback to true if permissions are not loaded yet or user is owner
-    // if (!user?.id) return false;
-    // if (user.role === 'owner') return true;
-    // if (!myPermissions || myPermissions.length === 0) return true; // Fallback for now
+    const permission = myPermissions.find(p => p.featureName === featureName);
+    if (!permission) return true; // Fallback for missing permission entries
     
-    // const permission = myPermissions.find(p => p.featureName === featureName);
-    // if (!permission) return true; // Fallback for missing permission entries
-    
-    // switch (action) {
-    //   case 'add': return permission.canAdd;
-    //   case 'edit': return permission.canEdit;
-    //   case 'delete': return permission.canDelete;
-    //   case 'view': return permission.canView;
-    //   default: return false;
-    // }
+    switch (action) {
+      case 'add': return permission.canAdd;
+      case 'edit': return permission.canEdit;
+      case 'delete': return permission.canDelete;
+      case 'view': return permission.canView;
+      default: return false;
+    }
   };
 
   return {

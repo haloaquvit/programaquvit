@@ -28,77 +28,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('[AuthContext] Fetching profile for user:', supabaseUser.id);
       
-      // Try profiles table first
-      let { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await supabase
+        .from('employees_view') // atau 'profiles' kalau kamu pakai itu
         .select('*')
         .eq('id', supabaseUser.id)
         .single();
 
-      // If profiles fails, try employees_view
       if (error) {
-        console.log('[AuthContext] Profiles failed, trying employees_view:', error);
-        const result = await supabase
-          .from('employees_view')
-          .select('*')
-          .eq('id', supabaseUser.id)
-          .single();
-        data = result.data;
-        error = result.error;
-      }
-
-      if (error) {
-        console.error('[AuthContext] Both queries failed:', error);
-        // Create a basic user profile from Supabase auth data
-        const basicProfile: Employee = {
-          id: supabaseUser.id,
-          name: supabaseUser.email?.split('@')[0] || 'User',
-          username: supabaseUser.email?.split('@')[0] || 'user',
-          email: supabaseUser.email || '',
-          role: 'owner', // Default to owner for now
-          phone: '',
-          address: '',
-          status: 'active',
-        };
-        console.log('[AuthContext] Using basic profile:', basicProfile);
-        setUser(basicProfile);
+        console.error('[AuthContext] Gagal ambil user profile:', error);
+        setUser(null); // fallback agar tidak stuck
         return;
       }
 
       if (!data) {
-        console.error('[AuthContext] User profile data is null');
+        console.error('[AuthContext] User profile tidak ditemukan');
         setUser(null);
         return;
       }
 
       const employeeProfile: Employee = {
         id: data.id,
-        name: data.full_name || data.name || supabaseUser.email?.split('@')[0] || 'User',
-        username: data.username || supabaseUser.email?.split('@')[0] || 'user',
-        email: data.email || supabaseUser.email || '',
-        role: data.role || 'owner',
-        phone: data.phone || '',
-        address: data.address || '',
-        status: data.status || 'active',
+        name: data.full_name,
+        username: data.username,
+        email: data.email,
+        role: data.role,
+        phone: data.phone,
+        address: data.address,
+        status: data.status,
       };
 
       console.log('[AuthContext] Profile loaded:', employeeProfile);
       setUser(employeeProfile);
     } catch (err) {
       console.error('[AuthContext] Error fetch profile:', err);
-      // Create fallback profile
-      const fallbackProfile: Employee = {
-        id: supabaseUser.id,
-        name: supabaseUser.email?.split('@')[0] || 'User',
-        username: supabaseUser.email?.split('@')[0] || 'user',
-        email: supabaseUser.email || '',
-        role: 'owner',
-        phone: '',
-        address: '',
-        status: 'active',
-      };
-      console.log('[AuthContext] Using fallback profile:', fallbackProfile);
-      setUser(fallbackProfile);
+      setUser(null); // fallback agar tidak stuck
     }
   };
 
