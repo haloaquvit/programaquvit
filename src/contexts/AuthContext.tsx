@@ -25,78 +25,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Fetch user profile dari Supabase
   const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
-    console.log('[AuthContext] Fetching profile for user:', supabaseUser.id);
-    
-    // ALWAYS create a basic profile immediately to unblock login
-    const basicProfile: Employee = {
-      id: supabaseUser.id,
-      name: supabaseUser.email?.split('@')[0] || 'User',
-      username: supabaseUser.email?.split('@')[0] || 'user',
-      email: supabaseUser.email || '',
-      role: 'owner', // Default to owner for full access
-      phone: '',
-      address: '',
-      status: 'active',
-    };
-    
-    console.log('[AuthContext] Setting basic profile immediately:', basicProfile);
-    setUser(basicProfile);
-    
-    // Try to get more details from database (optional, doesn't block login)
     try {
-      let { data, error } = await supabase
-        .from('profiles')
+      console.log('[AuthContext] Fetching profile for user:', supabaseUser.id);
+      
+      const { data, error } = await supabase
+        .from('employees_view')
         .select('*')
         .eq('id', supabaseUser.id)
         .single();
 
-      // If profiles fails, try employees_view
       if (error) {
-        console.log('[AuthContext] Profiles failed, trying employees_view:', error);
-        const result = await supabase
-          .from('employees_view')
-          .select('*')
-          .eq('id', supabaseUser.id)
-          .single();
-        data = result.data;
-        error = result.error;
+        console.error('[AuthContext] Gagal ambil user profile:', error);
+        setUser(null);
+        return;
       }
 
-      // If we got data from database, update the profile
-      if (!error && data) {
-        const enhancedProfile: Employee = {
-          id: data.id,
-          name: data.full_name || data.name || basicProfile.name,
-          username: data.username || basicProfile.username,
-          email: data.email || basicProfile.email,
-          role: data.role || basicProfile.role,
-          phone: data.phone || '',
-          address: data.address || '',
-          status: data.status || 'active',
-        };
-        
-        console.log('[AuthContext] Enhanced profile from DB:', enhancedProfile);
-        setUser(enhancedProfile);
-      } else {
-        console.log('[AuthContext] Database query failed, keeping basic profile');
+      if (!data) {
+        console.error('[AuthContext] User profile tidak ditemukan');
+        setUser(null);
+        return;
       }
+
+      const employeeProfile: Employee = {
+        id: data.id,
+        name: data.full_name,
+        username: data.username,
+        email: data.email,
+        role: data.role,
+        phone: data.phone,
+        address: data.address,
+        status: data.status,
+      };
+
+      console.log('[AuthContext] Profile loaded:', employeeProfile);
+      setUser(employeeProfile);
     } catch (err) {
-      console.error('[AuthContext] Database error, keeping basic profile:', err);
-      // Basic profile is already set, so we're good
+      console.error('[AuthContext] Error fetch profile:', err);
+      setUser(null);
     }
   };
 
   // Sign out
   const signOut = async () => {
     try {
-      // Logout current session (disable for now due to DB issues)
-      // const sessionToken = localStorage.getItem('session_token');
-      // if (sessionToken) {
-      //   await supabase.rpc('logout_session', {
-      //     p_session_token: sessionToken
-      //   });
-      //   localStorage.removeItem('session_token');
-      // }
+      // Logout current session
+      const sessionToken = localStorage.getItem('session_token');
+      if (sessionToken) {
+        await supabase.rpc('logout_session', {
+          p_session_token: sessionToken
+        });
+        localStorage.removeItem('session_token');
+      }
       
       await supabase.auth.signOut();
       setSession(null);
@@ -173,16 +152,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!isMounted) return;
       
       console.log('[AuthContext] Auth state changed:', _event, !!newSession);
-      
-      // Only update if session actually changed to prevent loops
-      if (newSession !== session) {
-        setSession(newSession);
+      setSession(newSession);
 
-        if (newSession?.user) {
-          await fetchUserProfile(newSession.user);
-        } else {
-          setUser(null);
-        }
+      if (newSession?.user) {
+        await fetchUserProfile(newSession.user);
+      } else {
+        setUser(null);
       }
     });
 
