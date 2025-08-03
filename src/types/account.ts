@@ -4,7 +4,8 @@ export interface Account {
   id: string;
   name: string;
   type: AccountType;
-  balance: number;
+  balance: number; // Saldo saat ini (dihitung dari initial_balance + transaksi)
+  initialBalance: number; // Saldo awal yang diinput owner
   isPaymentAccount: boolean; // Menandai akun yang bisa menerima pembayaran
   createdAt: Date;
 }

@@ -8,16 +8,20 @@ const fromDbToApp = (dbAccount: any): Account => ({
   name: dbAccount.name,
   type: dbAccount.type,
   balance: dbAccount.balance,
+  initialBalance: dbAccount.initial_balance || 0,
   isPaymentAccount: dbAccount.is_payment_account,
   createdAt: new Date(dbAccount.created_at),
 });
 
 // Helper to map from App (camelCase) to DB (snake_case)
 const fromAppToDb = (appAccount: Partial<Omit<Account, 'id' | 'createdAt'>>) => {
-  const { isPaymentAccount, ...rest } = appAccount as any;
+  const { isPaymentAccount, initialBalance, ...rest } = appAccount as any;
   const dbData: any = { ...rest };
   if (isPaymentAccount !== undefined) {
     dbData.is_payment_account = isPaymentAccount;
+  }
+  if (initialBalance !== undefined) {
+    dbData.initial_balance = initialBalance;
   }
   return dbData;
 };
@@ -37,6 +41,10 @@ export const useAccounts = () => {
   const addAccount = useMutation({
     mutationFn: async (newAccountData: Omit<Account, 'id' | 'createdAt'>): Promise<Account> => {
       const dbData = fromAppToDb(newAccountData);
+      // Set initial_balance equal to balance when creating new account
+      if (!dbData.initial_balance && dbData.balance) {
+        dbData.initial_balance = dbData.balance;
+      }
       const { data, error } = await supabase
         .from('accounts')
         .insert({ ...dbData, id: `acc-${Date.now()}` })
@@ -56,8 +64,9 @@ export const useAccounts = () => {
       if (fetchError) throw fetchError;
 
       const newBalance = currentAccount.balance + amount;
-      const { error: updateError } = await supabase.from('accounts').update({ balance: newBalance }).eq('id', accountId);
+      const { data, error: updateError } = await supabase.from('accounts').update({ balance: newBalance }).eq('id', accountId).select().single();
       if (updateError) throw updateError;
+      return fromDbToApp(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
@@ -68,6 +77,40 @@ export const useAccounts = () => {
     mutationFn: async ({ accountId, newData }: { accountId: string, newData: Partial<Account> }) => {
       const dbData = fromAppToDb(newData);
       const { data, error } = await supabase.from('accounts').update(dbData).eq('id', accountId).select().single();
+      if (error) throw error;
+      return fromDbToApp(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    }
+  })
+
+  const updateInitialBalance = useMutation({
+    mutationFn: async ({ accountId, initialBalance }: { accountId: string, initialBalance: number }) => {
+      // Get current balance and calculate the difference
+      const { data: currentAccount, error: fetchError } = await supabase
+        .from('accounts')
+        .select('balance, initial_balance')
+        .eq('id', accountId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+
+      // Calculate how much the balance should change
+      const balanceDifference = initialBalance - (currentAccount.initial_balance || 0);
+      const newBalance = currentAccount.balance + balanceDifference;
+
+      // Update both initial_balance and balance
+      const { data, error } = await supabase
+        .from('accounts')
+        .update({ 
+          initial_balance: initialBalance,
+          balance: newBalance 
+        })
+        .eq('id', accountId)
+        .select()
+        .single();
+        
       if (error) throw error;
       return fromDbToApp(data);
     },
@@ -95,6 +138,7 @@ export const useAccounts = () => {
     addAccount,
     updateAccountBalance,
     updateAccount,
+    updateInitialBalance,
     deleteAccount,
   }
 }

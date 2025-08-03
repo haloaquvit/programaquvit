@@ -71,16 +71,26 @@ const getStatusVariant = (status: TransactionStatus) => {
 }
 
 const getAvailableStatusOptions = (currentStatus: TransactionStatus, userRole: UserRole): TransactionStatus[] => {
-  const powerRoles: UserRole[] = ['admin', 'owner', 'supervisor', 'ceo', 'me', 'designer', 'cashier'];
-
-  if (powerRoles.includes(userRole)) {
-    return statusOptions;
-  }
-
+  // Sequential workflow for all users
   switch (currentStatus) {
+    case 'Pesanan Masuk':
+      return ['Pesanan Masuk', 'Proses Design', 'Dibatalkan'];
+    
+    case 'Proses Design':
+      return ['Proses Design', 'ACC Costumer', 'Dibatalkan'];
+    
+    case 'ACC Costumer':
+      return ['ACC Costumer', 'Proses Produksi', 'Dibatalkan'];
+    
     case 'Proses Produksi':
-      if (userRole === 'operator') return ['Proses Produksi', 'Pesanan Selesai'];
-      return [currentStatus];
+      return ['Proses Produksi', 'Pesanan Selesai', 'Dibatalkan'];
+    
+    case 'Pesanan Selesai':
+      return ['Pesanan Selesai']; // Cannot change from completed
+    
+    case 'Dibatalkan':
+      return ['Dibatalkan']; // Cannot change from canceled
+    
     default:
       return [currentStatus];
   }
@@ -93,8 +103,21 @@ export function TransactionTable() {
   const { transactions, isLoading, updateTransactionStatus, deductMaterials, deleteTransaction } = useTransactions();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [selectedTransaction, setSelectedTransaction] = React.useState<Transaction | null>(null);
+  const [isCancelWarningOpen, setIsCancelWarningOpen] = React.useState(false);
+  const [cancelTransactionData, setCancelTransactionData] = React.useState<{id: string, status: TransactionStatus} | null>(null);
 
   const handleStatusChange = (transactionId: string, newStatus: TransactionStatus) => {
+    // Check if trying to cancel a transaction that's already in production
+    if (newStatus === 'Dibatalkan') {
+      const transaction = transactions?.find(t => t.id === transactionId);
+      if (transaction && transaction.status === 'Proses Produksi') {
+        setCancelTransactionData({ id: transactionId, status: newStatus });
+        setIsCancelWarningOpen(true);
+        return;
+      }
+    }
+
+    // Proceed with normal status update
     updateTransactionStatus.mutate({ transactionId, status: newStatus }, {
       onSuccess: () => {
         toast({
@@ -119,6 +142,27 @@ export function TransactionTable() {
         toast({ variant: "destructive", title: "Gagal", description: error.message });
       }
     });
+  };
+
+  const confirmCancelProduction = () => {
+    if (cancelTransactionData) {
+      updateTransactionStatus.mutate({ 
+        transactionId: cancelTransactionData.id, 
+        status: cancelTransactionData.status 
+      }, {
+        onSuccess: () => {
+          toast({
+            title: "Pesanan Dibatalkan",
+            description: `Pesanan ${cancelTransactionData.id} telah dibatalkan meskipun sudah dalam proses produksi.`,
+          });
+          setIsCancelWarningOpen(false);
+          setCancelTransactionData(null);
+        },
+        onError: (error) => {
+          toast({ variant: "destructive", title: "Gagal", description: error.message });
+        }
+      });
+    }
   };
 
   const handleDeleteClick = (transaction: Transaction) => {
@@ -333,6 +377,34 @@ export function TransactionTable() {
               disabled={deleteTransaction.isPending}
             >
               {deleteTransaction.isPending ? "Menghapus..." : "Ya, Hapus"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isCancelWarningOpen} onOpenChange={setIsCancelWarningOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Peringatan: Barang Sudah Diproduksi</AlertDialogTitle>
+            <AlertDialogDescription>
+              Barang sudah di produksi yakin ingin membatalkan pesanan <strong>{cancelTransactionData?.id}</strong>?
+              <br /><br />
+              <span className="text-orange-600 font-medium">Perhatian:</span> Pembatalan ini akan mempengaruhi stok dan biaya produksi yang sudah dikeluarkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsCancelWarningOpen(false);
+              setCancelTransactionData(null);
+            }}>
+              Tidak, Tetap Lanjutkan Produksi
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(badgeVariants({ variant: "destructive" }))}
+              onClick={confirmCancelProduction}
+              disabled={updateTransactionStatus.isPending}
+            >
+              {updateTransactionStatus.isPending ? "Membatalkan..." : "Ya, Batalkan Pesanan"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

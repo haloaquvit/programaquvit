@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { useToast } from "./ui/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { useUsers } from "@/hooks/useUsers"
@@ -108,6 +109,19 @@ export function EmployeeAdvanceManagement() {
   const isAdminOrOwner = user?.role === 'admin' || user?.role === 'owner';
   const isOwner = user?.role === 'owner';
 
+  const groupedAdvances = advances?.reduce((groups, advance) => {
+    const employeeName = advance.employeeName;
+    if (!groups[employeeName]) {
+      groups[employeeName] = [];
+    }
+    groups[employeeName].push(advance);
+    return groups;
+  }, {} as Record<string, EmployeeAdvance[]>) || {};
+
+  const getEmployeeTotalDebt = (employeeAdvances: EmployeeAdvance[]) => {
+    return employeeAdvances.reduce((total, advance) => total + advance.remainingAmount, 0);
+  };
+
   if (isError) {
     return (
       <Card>
@@ -179,57 +193,115 @@ export function EmployeeAdvanceManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Riwayat Panjar Karyawan</CardTitle>
+          <CardDescription>Klik nama karyawan untuk melihat detail panjar</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>Karyawan</TableHead><TableHead>Tgl Panjar</TableHead><TableHead>Total Utang</TableHead><TableHead>Sisa Utang</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {loadingAdvances ? <TableRow><TableCell colSpan={6}>Memuat...</TableCell></TableRow> :
-                advances?.map(adv => (
-                  <TableRow key={adv.id}>
-                    <TableCell className="font-medium">{adv.employeeName}</TableCell>
-                    <TableCell>{format(new Date(adv.date), "d MMM yyyy", { locale: id })}</TableCell>
-                    <TableCell>{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(adv.amount)}</TableCell>
-                    <TableCell className="font-bold text-destructive">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(adv.remainingAmount)}</TableCell>
-                    <TableCell><Badge variant={adv.remainingAmount <= 0 ? "success" : "destructive"}>{adv.remainingAmount <= 0 ? 'Lunas' : 'Belum Lunas'}</Badge></TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleOpenRepayDialog(adv)} disabled={adv.remainingAmount <= 0}>
-                          Bayar Cicilan
-                        </Button>
-                        {isOwner && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tindakan ini akan menghapus data panjar untuk {adv.employeeName} dan mengembalikan saldo ke akun asal. Tindakan ini tidak dapat dibatalkan.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Batal</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteAdvance(adv)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Ya, Hapus
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
+          {loadingAdvances ? (
+            <div className="text-center py-4">Memuat...</div>
+          ) : Object.keys(groupedAdvances).length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Belum ada data panjar karyawan
+            </div>
+          ) : (
+            <Accordion type="multiple" className="w-full">
+              {Object.entries(groupedAdvances).map(([employeeName, employeeAdvances]) => {
+                const totalDebt = getEmployeeTotalDebt(employeeAdvances);
+                const hasUnpaidAdvances = employeeAdvances.some(adv => adv.remainingAmount > 0);
+                
+                return (
+                  <AccordionItem key={employeeName} value={employeeName}>
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center justify-between w-full mr-4">
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold">{employeeName}</span>
+                          <Badge variant={hasUnpaidAdvances ? "destructive" : "success"}>
+                            {employeeAdvances.length} panjar
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Total Sisa:</span>
+                          <span className={`font-bold ${totalDebt > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                            {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(totalDebt)}
+                          </span>
+                        </div>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              }
-            </TableBody>
-          </Table>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-3 pt-2">
+                        {employeeAdvances.map(adv => (
+                          <div key={adv.id} className="border rounded-lg p-4 bg-muted/30">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-center">
+                              <div>
+                                <p className="text-sm text-muted-foreground">Tanggal Panjar</p>
+                                <p className="font-medium">{format(new Date(adv.date), "d MMM yyyy", { locale: id })}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">Total Panjar</p>
+                                <p className="font-medium">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(adv.amount)}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">Sisa Utang</p>
+                                <div className="flex items-center gap-2">
+                                  <p className={`font-bold ${adv.remainingAmount > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                                    {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(adv.remainingAmount)}
+                                  </p>
+                                  <Badge variant={adv.remainingAmount <= 0 ? "success" : "destructive"}>
+                                    {adv.remainingAmount <= 0 ? 'Lunas' : 'Belum Lunas'}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleOpenRepayDialog(adv)} 
+                                  disabled={adv.remainingAmount <= 0}
+                                >
+                                  Bayar Cicilan
+                                </Button>
+                                {isOwner && (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="icon">
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Tindakan ini akan menghapus data panjar untuk {adv.employeeName} dan mengembalikan saldo ke akun asal. Tindakan ini tidak dapat dibatalkan.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Batal</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => handleDeleteAdvance(adv)}
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        >
+                                          Ya, Hapus
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                )}
+                              </div>
+                            </div>
+                            {adv.notes && (
+                              <div className="mt-3 pt-3 border-t">
+                                <p className="text-sm text-muted-foreground">Catatan:</p>
+                                <p className="text-sm">{adv.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          )}
         </CardContent>
       </Card>
     </div>

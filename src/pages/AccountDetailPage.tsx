@@ -14,28 +14,29 @@ import { useState, useEffect } from "react"
 
 export default function AccountDetailPage() {
   const { id: accountId } = useParams<{ id: string }>()
-  const { accounts, isLoading, updateAccount } = useAccounts()
+  const { accounts, isLoading, updateAccount, updateInitialBalance } = useAccounts()
   const { toast } = useToast()
   const { user } = useAuth()
   
   const account = accounts?.find(a => a.id === accountId)
+  const isOwner = user?.role === 'owner'
   const isAdminOrOwner = user?.role === 'admin' || user?.role === 'owner'
 
-  const [initialBalance, setInitialBalance] = useState(account?.balance || 0)
+  const [initialBalance, setInitialBalance] = useState(account?.initialBalance || 0)
   const [isPaymentAccount, setIsPaymentAccount] = useState(account?.isPaymentAccount || false)
 
   useEffect(() => {
     if (account) {
-      setInitialBalance(account.balance)
+      setInitialBalance(account.initialBalance)
       setIsPaymentAccount(account.isPaymentAccount)
     }
   }, [account])
 
   const handleUpdateInitialBalance = () => {
     if (!accountId) return;
-    updateAccount.mutate({
+    updateInitialBalance.mutate({
       accountId: accountId,
-      newData: { balance: initialBalance }
+      initialBalance: initialBalance
     }, {
       onSuccess: () => {
         toast({ title: "Sukses", description: "Saldo awal berhasil diupdate." })
@@ -94,10 +95,20 @@ export default function AccountDetailPage() {
           <CardTitle>Informasi Akun</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <p className="text-sm text-muted-foreground">Tipe Akun</p>
               <p className="text-lg font-medium">{account.type}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Saldo Awal</p>
+              <p className="text-xl font-semibold text-blue-600">
+                {new Intl.NumberFormat("id-ID", { 
+                  style: "currency", 
+                  currency: "IDR" 
+                }).format(account.initialBalance)}
+              </p>
+              <p className="text-xs text-muted-foreground">Diinput oleh owner</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Saldo Saat Ini</p>
@@ -107,6 +118,7 @@ export default function AccountDetailPage() {
                   currency: "IDR" 
                 }).format(account.balance)}
               </p>
+              <p className="text-xs text-muted-foreground">Saldo awal + transaksi</p>
             </div>
           </div>
 
@@ -128,24 +140,30 @@ export default function AccountDetailPage() {
                 </CardDescription>
               </div>
 
-              <div className="pt-4 border-t">
-                <h3 className="font-semibold mb-2">Update Saldo Awal</h3>
-                <CardDescription className="mb-2">
-                  Gunakan ini hanya untuk koreksi atau penyesuaian saldo. Transaksi normal harus dicatat melalui menu Pengeluaran atau Kasir.
-                </CardDescription>
-                <div className="flex gap-2 items-center max-w-sm">
-                  <Label htmlFor="initialBalance" className="sr-only">Saldo Awal</Label>
-                  <Input 
-                    id="initialBalance"
-                    type="number" 
-                    value={initialBalance}
-                    onChange={(e) => setInitialBalance(Number(e.target.value))}
-                  />
-                  <Button onClick={handleUpdateInitialBalance} disabled={updateAccount.isPending}>
-                    {updateAccount.isPending ? "Menyimpan..." : "Simpan Saldo"}
-                  </Button>
+              {isOwner && (
+                <div className="pt-4 border-t">
+                  <h3 className="font-semibold mb-2">Update Saldo Awal (Owner Only)</h3>
+                  <CardDescription className="mb-2">
+                    Saldo awal adalah modal yang diinput oleh owner untuk akun ini. Perubahan saldo awal akan mempengaruhi saldo saat ini.
+                  </CardDescription>
+                  <div className="flex gap-2 items-center max-w-sm">
+                    <Label htmlFor="initialBalance" className="sr-only">Saldo Awal</Label>
+                    <Input 
+                      id="initialBalance"
+                      type="number" 
+                      value={initialBalance}
+                      onChange={(e) => setInitialBalance(Number(e.target.value))}
+                      placeholder="Masukkan saldo awal..."
+                    />
+                    <Button onClick={handleUpdateInitialBalance} disabled={updateInitialBalance.isPending}>
+                      {updateInitialBalance.isPending ? "Menyimpan..." : "Update Saldo Awal"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Saldo saat ini akan disesuaikan secara otomatis: {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(initialBalance + (account.balance - account.initialBalance))}
+                  </p>
                 </div>
-              </div>
+              )}
             </>
           )}
         </CardContent>

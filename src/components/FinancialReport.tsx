@@ -10,12 +10,15 @@ import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { DateRange } from "react-day-picker"
 import { addDays, startOfMonth, endOfMonth, format, startOfDay, endOfDay } from "date-fns"
 import { id } from "date-fns/locale/id"
-import { Download, TrendingUp, TrendingDown, Wallet, Scale, HandCoins } from "lucide-react"
+import { Download, TrendingUp, TrendingDown, Wallet, Scale, HandCoins, ArrowRightLeft } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { useAccounts } from "@/hooks/useAccounts"
 import { useEmployeeAdvances } from "@/hooks/useEmployeeAdvances"
 import { useCompanySettings } from "@/hooks/useCompanySettings"
+import { useAuth } from "@/hooks/useAuth"
+import { TransferAccountDialog } from "./TransferAccountDialog"
+import { useAccountTransfers } from "@/hooks/useAccountTransfers"
 
 export function FinancialReport() {
   const { transactions } = useTransactions()
@@ -23,28 +26,40 @@ export function FinancialReport() {
   const { advances } = useEmployeeAdvances()
   const { accounts } = useAccounts()
   const { settings: companyInfo } = useCompanySettings();
+  const { user } = useAuth()
+  const { transfers } = useAccountTransfers()
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
   })
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
 
   const filteredData = useMemo(() => {
-    if (!transactions || !expenses) return { income: [], expense: [] }
+    if (!transactions || !expenses) return { income: [], expense: [], transfers: [] }
     const from = dateRange?.from
     const to = dateRange?.to
+    
     const filteredIncome = transactions.filter(t => {
       const transactionDate = new Date(t.orderDate)
       if (from && to) return transactionDate >= from && transactionDate <= to
       return true
     })
+    
     const filteredExpense = expenses.filter(e => {
       const expenseDate = new Date(e.date)
       if (from && to) return expenseDate >= from && expenseDate <= to
       return true
     })
-    return { income: filteredIncome, expense: filteredExpense }
-  }, [transactions, expenses, dateRange])
+
+    const filteredTransfers = transfers?.filter(t => {
+      const transferDate = new Date(t.createdAt)
+      if (from && to) return transferDate >= from && transferDate <= to
+      return true
+    }) || []
+    
+    return { income: filteredIncome, expense: filteredExpense, transfers: filteredTransfers }
+  }, [transactions, expenses, transfers, dateRange])
 
   const summary = useMemo(() => {
     const totalIncome = filteredData.income.reduce((sum, t) => sum + t.total, 0)
@@ -216,13 +231,30 @@ export function FinancialReport() {
     doc.save(`MDILaporanKasKecil-${format(new Date(), "yyyyMMdd-HHmmss")}.pdf`);
   };
 
+  // Check if user is owner or cashier
+  const canTransfer = user?.role === 'owner' || user?.role === 'cashier'
+
   return (
     <div className="space-y-6">
+      <TransferAccountDialog 
+        open={isTransferDialogOpen} 
+        onOpenChange={setIsTransferDialogOpen} 
+      />
+      
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <div><CardTitle>Laporan Keuangan</CardTitle><CardDescription>Analisis pendapatan, pengeluaran, dan laba bersih perusahaan.</CardDescription></div>
           <div className="flex items-center gap-2">
             <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+            {canTransfer && (
+              <Button 
+                onClick={() => setIsTransferDialogOpen(true)} 
+                variant="secondary"
+              >
+                <ArrowRightLeft className="mr-2 h-4 w-4" /> 
+                Transfer Antar Akun
+              </Button>
+            )}
             <Button onClick={generatePdf}><Download className="mr-2 h-4 w-4" /> Unduh Laporan Keuangan</Button>
             <Button onClick={generateKasKecilPdf} variant="outline" disabled={!kasKecilReport}><Download className="mr-2 h-4 w-4" /> Cetak Kas Kecil</Button>
           </div>
@@ -302,6 +334,64 @@ export function FinancialReport() {
         <Card id="pendapatan-details"><CardHeader><CardTitle>Rincian Pendapatan</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Tanggal</TableHead><TableHead>Pelanggan</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader><TableBody>{filteredData.income.map(t => <TableRow key={t.id}><TableCell>{format(new Date(t.orderDate), "d MMM yyyy")}</TableCell><TableCell>{t.customerName}</TableCell><TableCell className="text-right">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(t.total)}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
         <Card id="pengeluaran-details"><CardHeader><CardTitle>Rincian Pengeluaran</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Tanggal</TableHead><TableHead>Deskripsi</TableHead><TableHead className="text-right">Jumlah</TableHead></TableRow></TableHeader><TableBody>{filteredData.expense.map(e => <TableRow key={e.id}><TableCell>{format(new Date(e.date), "d MMM yyyy")}</TableCell><TableCell>{e.description}</TableCell><TableCell className="text-right">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(e.amount)}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
       </div>
+
+      {filteredData.transfers.length > 0 && (
+        <Card id="transfer-details">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5" />
+              Riwayat Transfer Antar Akun
+            </CardTitle>
+            <CardDescription>
+              Transfer yang dilakukan pada periode {dateRange?.from ? format(dateRange.from, "d MMM yyyy", { locale: id }) : ''} - {dateRange?.to ? format(dateRange.to, "d MMM yyyy", { locale: id }) : ''}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Dari Akun</TableHead>
+                  <TableHead>Ke Akun</TableHead>
+                  <TableHead>Keterangan</TableHead>
+                  <TableHead>Diinput Oleh</TableHead>
+                  <TableHead className="text-right">Jumlah</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredData.transfers.map(transfer => {
+                  const fromAccount = accounts?.find(acc => acc.id === transfer.fromAccountId)
+                  const toAccount = accounts?.find(acc => acc.id === transfer.toAccountId)
+                  return (
+                    <TableRow key={transfer.id}>
+                      <TableCell>
+                        {format(new Date(transfer.createdAt), "d MMM yyyy, HH:mm", { locale: id })}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {fromAccount?.name || transfer.fromAccountId}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {toAccount?.name || transfer.toAccountId}
+                      </TableCell>
+                      <TableCell>
+                        {transfer.description}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">{transfer.userName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-blue-600">
+                        {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transfer.amount)}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

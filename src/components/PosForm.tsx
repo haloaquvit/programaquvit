@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { PlusCircle, Trash2, Search, UserPlus, Wallet, FileText } from 'lucide-react'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { PlusCircle, Trash2, Search, UserPlus, Wallet, FileText, Check, ChevronsUpDown } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { useToast } from '@/components/ui/use-toast'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
@@ -62,6 +65,7 @@ export const PosForm = () => {
   const [savedTransaction, setSavedTransaction] = useState<Transaction | null>(null)
   const [sourceQuotationId, setSourceQuotationId] = useState<string | null>(null)
   const [isQuotationProcessed, setIsQuotationProcessed] = useState(false);
+  const [openProductDropdowns, setOpenProductDropdowns] = useState<{[key: number]: boolean}>({});
 
   useEffect(() => {
     const quotationData = location.state?.quotationData as Quotation | undefined;
@@ -231,26 +235,85 @@ export const PosForm = () => {
             </div>
           </div>
         </div>
-        
-        <div className="overflow-x-auto border rounded-lg">
-          <Table>
-            <TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Keterangan</TableHead><TableHead>Qty</TableHead><TableHead>Satuan</TableHead><TableHead>Harga Satuan</TableHead><TableHead>Total</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {items.map((item, index) => (
-                <TableRow key={item.id}>
-                  <TableCell className="min-w-[200px]"><Select onValueChange={(v) => handleItemChange(index, 'product', products?.find(p => p.id === v))} value={item.product?.id}><SelectTrigger><SelectValue placeholder="Pilih Produk" /></SelectTrigger><SelectContent>{isLoadingProducts ? <SelectItem value="loading" disabled>Memuat...</SelectItem> : products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></TableCell>
-                  <TableCell className="min-w-[200px]"><Input value={item.keterangan} onChange={(e) => handleItemChange(index, 'keterangan', e.target.value)} placeholder="Detail, ukuran, dll." /></TableCell>
-                  <TableCell className="min-w-[80px]"><Input type="number" value={item.qty} onChange={(e) => handleItemChange(index, 'qty', Number(e.target.value))} /></TableCell>
-                  <TableCell className="min-w-[120px]"><Input value={item.unit} onChange={(e) => handleItemChange(index, 'unit', e.target.value)} placeholder="pcs, m², etc" /></TableCell>
-                  <TableCell className="min-w-[150px]"><Input type="number" value={item.harga} onChange={(e) => handleItemChange(index, 'harga', Number(e.target.value))} /></TableCell>
-                  <TableCell className="font-medium text-right">{new Intl.NumberFormat("id-ID").format(item.qty * item.harga)}</TableCell>
-                  <TableCell><Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-lg">Daftar Item</h3>
+            <Button type="button" onClick={handleAddItem} variant="outline" className=""><PlusCircle className="mr-2 h-4 w-4" /> Tambah Item</Button>
+          </div>
+          
+          <div className="overflow-x-auto border rounded-lg">
+            <Table>
+              <TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Keterangan</TableHead><TableHead>Qty</TableHead><TableHead>Satuan</TableHead><TableHead>Harga Satuan</TableHead><TableHead>Total</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {items.map((item, index) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="min-w-[200px]">
+                      <Popover open={openProductDropdowns[index]} onOpenChange={(open) => setOpenProductDropdowns({...openProductDropdowns, [index]: open})}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openProductDropdowns[index]}
+                            className="w-full justify-between"
+                          >
+                            {item.product?.name || "Pilih Produk..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Cari produk..." />
+                            <CommandList>
+                              <CommandEmpty>Produk tidak ditemukan.</CommandEmpty>
+                              <CommandGroup>
+                                {products?.map((product) => (
+                                  <CommandItem
+                                    key={product.id}
+                                    value={`${product.name} ${product.basePrice}`}
+                                    onSelect={() => {
+                                      handleItemChange(index, 'product', product);
+                                      setOpenProductDropdowns({...openProductDropdowns, [index]: false});
+                                    }}
+                                  >
+                                    <div className="flex flex-col w-full">
+                                      <span className="font-medium">{product.name}</span>
+                                      <span className="text-sm text-muted-foreground">
+                                        {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(product.basePrice || 0)} / {product.unit}
+                                      </span>
+                                    </div>
+                                    <Check
+                                      className={cn(
+                                        "ml-auto h-4 w-4",
+                                        item.product?.id === product.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </TableCell>
+                    <TableCell className="min-w-[200px]"><Input value={item.keterangan} onChange={(e) => handleItemChange(index, 'keterangan', e.target.value)} placeholder="Detail, ukuran, dll." /></TableCell>
+                    <TableCell className="min-w-[80px]"><Input type="number" value={item.qty} onChange={(e) => handleItemChange(index, 'qty', Number(e.target.value))} /></TableCell>
+                    <TableCell className="min-w-[120px]"><Input value={item.unit} onChange={(e) => handleItemChange(index, 'unit', e.target.value)} placeholder="pcs, m², etc" /></TableCell>
+                    <TableCell className="min-w-[150px]"><Input type="number" value={item.harga} onChange={(e) => handleItemChange(index, 'harga', Number(e.target.value))} /></TableCell>
+                    <TableCell className="font-medium text-right">{new Intl.NumberFormat("id-ID").format(item.qty * item.harga)}</TableCell>
+                    <TableCell><Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          {items.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
+              <PlusCircle className="mx-auto h-12 w-12 mb-2 opacity-50" />
+              <p>Belum ada item. Klik "Tambah Item" untuk menambahkan produk.</p>
+            </div>
+          )}
         </div>
-        <Button type="button" onClick={handleAddItem} variant="outline" className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Tambah Item</Button>
 
         <div className="flex justify-between items-end gap-4 pt-6 border-t">
           <div className="flex gap-4">

@@ -1,4 +1,5 @@
 "use client"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -15,7 +16,9 @@ import { AccountType } from "@/types/account"
 import { useNavigate } from "react-router-dom"
 import { Skeleton } from "./ui/skeleton"
 import { useAuth } from "@/hooks/useAuth"
-import { Trash2 } from "lucide-react"
+import { Trash2, ArrowRightLeft } from "lucide-react"
+import { format } from "date-fns"
+import { id } from "date-fns/locale/id"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,11 +30,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { TransferAccountDialog } from "./TransferAccountDialog"
+import { useAccountTransfers } from "@/hooks/useAccountTransfers"
 
 const accountSchema = z.object({
   name: z.string().min(3, "Nama akun minimal 3 karakter."),
   type: z.enum(['Aset', 'Kewajiban', 'Modal', 'Pendapatan', 'Beban']),
   balance: z.coerce.number().min(0, "Saldo awal tidak boleh negatif."),
+  initialBalance: z.coerce.number().min(0, "Saldo awal tidak boleh negatif."),
   isPaymentAccount: z.boolean().default(false),
 })
 
@@ -44,6 +50,8 @@ export function AccountManagement() {
   const { toast } = useToast()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { transfers, isLoading: isLoadingTransfers } = useAccountTransfers()
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
@@ -51,6 +59,7 @@ export function AccountManagement() {
       name: '',
       type: 'Aset',
       balance: 0,
+      initialBalance: 0,
       isPaymentAccount: false,
     }
   })
@@ -60,6 +69,7 @@ export function AccountManagement() {
       name: data.name,
       type: data.type,
       balance: data.balance,
+      initialBalance: data.balance, // Set initial balance equal to balance for new accounts
       isPaymentAccount: data.isPaymentAccount,
     };
     addAccount.mutate(newAccountData, {
@@ -68,6 +78,7 @@ export function AccountManagement() {
         reset({
           name: '',
           balance: 0,
+          initialBalance: 0,
           isPaymentAccount: false,
           type: 'Aset'
         })
@@ -90,9 +101,14 @@ export function AccountManagement() {
   }
 
   const isAdminOrOwner = user?.role === 'admin' || user?.role === 'owner';
+  const canTransfer = user?.role === 'owner' || user?.role === 'cashier';
 
   return (
     <div className="space-y-6">
+      <TransferAccountDialog 
+        open={isTransferDialogOpen} 
+        onOpenChange={setIsTransferDialogOpen} 
+      />
       <Card>
         <CardHeader>
           <CardTitle>Tambah Akun Keuangan Baru</CardTitle>
@@ -134,8 +150,20 @@ export function AccountManagement() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Daftar Akun</CardTitle>
+        <CardHeader className="flex-row items-center justify-between">
+          <div>
+            <CardTitle>Daftar Akun</CardTitle>
+            <CardDescription>Kelola semua akun keuangan perusahaan</CardDescription>
+          </div>
+          {canTransfer && (
+            <Button 
+              onClick={() => setIsTransferDialogOpen(true)} 
+              variant="secondary"
+            >
+              <ArrowRightLeft className="mr-2 h-4 w-4" /> 
+              Transfer Antar Akun
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -196,6 +224,76 @@ export function AccountManagement() {
               </TableBody>
             </Table>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ArrowRightLeft className="h-5 w-5" />
+            Riwayat Transfer Antar Akun
+          </CardTitle>
+          <CardDescription>
+            Semua transfer yang dilakukan antar akun keuangan
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingTransfers ? (
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ) : transfers && transfers.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Dari Akun</TableHead>
+                  <TableHead>Ke Akun</TableHead>
+                  <TableHead>Keterangan</TableHead>
+                  <TableHead>Diinput Oleh</TableHead>
+                  <TableHead className="text-right">Jumlah</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transfers.map(transfer => {
+                  const fromAccount = accounts?.find(acc => acc.id === transfer.fromAccountId)
+                  const toAccount = accounts?.find(acc => acc.id === transfer.toAccountId)
+                  return (
+                    <TableRow key={transfer.id}>
+                      <TableCell>
+                        {format(new Date(transfer.createdAt), "d MMM yyyy, HH:mm", { locale: id })}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {fromAccount?.name || transfer.fromAccountId}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {toAccount?.name || transfer.toAccountId}
+                      </TableCell>
+                      <TableCell>
+                        {transfer.description}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">{transfer.userName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-blue-600">
+                        {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transfer.amount)}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <ArrowRightLeft className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Belum ada riwayat transfer antar akun.</p>
+              <p className="text-sm">Transfer pertama akan muncul di sini setelah dilakukan.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
