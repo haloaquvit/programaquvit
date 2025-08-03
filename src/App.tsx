@@ -35,6 +35,9 @@ const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const AttendancePage = lazy(() => import("@/pages/AttendancePage"));
 const AttendanceReportPage = lazy(() => import("@/pages/AttendanceReportPage"));
+const StockReportPage = lazy(() => import("@/pages/StockReportPage"));
+const TransactionItemsReportPage = lazy(() => import("@/pages/TransactionItemsReportPage"));
+const RolePermissionPage = lazy(() => import("@/pages/RolePermissionPage"));
 
 function App() {
   // Handle chunk loading errors
@@ -85,6 +88,9 @@ function App() {
                   <Route path="/account-settings" element={<AccountSettingsPage />} />
                   <Route path="/attendance" element={<AttendancePage />} />
                   <Route path="/attendance/report" element={<AttendanceReportPage />} />
+                  <Route path="/stock-report" element={<StockReportPage />} />
+                  <Route path="/transaction-items-report" element={<TransactionItemsReportPage />} />
+                  <Route path="/role-permissions" element={<RolePermissionPage />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
               )}

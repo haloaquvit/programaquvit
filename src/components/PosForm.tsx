@@ -7,10 +7,12 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { PlusCircle, Trash2, Search, UserPlus, Wallet, FileText, Check, ChevronsUpDown } from 'lucide-react'
+import { PlusCircle, Trash2, Search, UserPlus, Wallet, FileText, Check, ChevronsUpDown, Percent } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { useToast } from '@/components/ui/use-toast'
+import { Switch } from '@/components/ui/switch'
+import { calculatePPN, getDefaultPPNPercentage } from '@/utils/ppnCalculations'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { Textarea } from './ui/textarea'
 import { useProducts } from '@/hooks/useProducts'
@@ -59,6 +61,8 @@ export const PosForm = () => {
   const [items, setItems] = useState<FormTransactionItem[]>([])
   const [diskon, setDiskon] = useState(0)
   const [paidAmount, setPaidAmount] = useState(0)
+  const [ppnEnabled, setPpnEnabled] = useState(false)
+  const [ppnPercentage, setPpnPercentage] = useState(getDefaultPPNPercentage())
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false)
   const [isCustomerAddOpen, setIsCustomerAddOpen] = useState(false)
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false)
@@ -90,7 +94,14 @@ export const PosForm = () => {
   }, [location.state, customers, navigate, isQuotationProcessed]);
 
   const subTotal = useMemo(() => items.reduce((total, item) => total + (item.qty * item.harga), 0), [items]);
-  const totalTagihan = useMemo(() => subTotal - diskon, [subTotal, diskon]);
+  const subtotalAfterDiskon = useMemo(() => subTotal - diskon, [subTotal, diskon]);
+  const ppnCalculation = useMemo(() => {
+    if (ppnEnabled) {
+      return calculatePPN(subtotalAfterDiskon, ppnPercentage);
+    }
+    return { subtotal: subtotalAfterDiskon, ppnAmount: 0, total: subtotalAfterDiskon };
+  }, [subtotalAfterDiskon, ppnEnabled, ppnPercentage]);
+  const totalTagihan = useMemo(() => ppnCalculation.total, [ppnCalculation]);
   const sisaTagihan = useMemo(() => totalTagihan - paidAmount, [totalTagihan, paidAmount]);
 
   const designers = useMemo(() => users?.filter(u => u.role === 'designer'), [users]);
@@ -162,6 +173,10 @@ export const PosForm = () => {
       orderDate: orderDate || new Date(),
       finishDate: finishDate || null,
       items: transactionItems,
+      subtotal: ppnCalculation.subtotal,
+      ppnEnabled: ppnEnabled,
+      ppnPercentage: ppnPercentage,
+      ppnAmount: ppnCalculation.ppnAmount,
       total: totalTagihan,
       paidAmount: paidAmount,
       paymentStatus: paymentStatus,
@@ -184,6 +199,8 @@ export const PosForm = () => {
         setPaidAmount(0);
         setPaymentAccountId('');
         setSourceQuotationId(null);
+        setPpnEnabled(false);
+        setPpnPercentage(getDefaultPPNPercentage());
       },
       onError: (error) => {
         toast({ variant: "destructive", title: "Gagal Menyimpan", description: error.message });

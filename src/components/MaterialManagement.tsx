@@ -1,11 +1,12 @@
 "use client"
 import { useState } from 'react'
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -16,9 +17,11 @@ import { AddStockDialog } from './AddStockDialog'
 import { RequestPoDialog } from './RequestPoDialog'
 import { Badge } from './ui/badge'
 import { useToast } from './ui/use-toast'
+import { Trash2 } from 'lucide-react'
 
 const materialSchema = z.object({
   name: z.string().min(3, { message: "Nama bahan minimal 3 karakter." }),
+  type: z.enum(['Stock', 'Beli'], { message: "Pilih jenis bahan." }),
   unit: z.string().min(1, { message: "Satuan harus diisi (cth: meter, lembar, kg)." }),
   pricePerUnit: z.coerce.number().min(0, { message: "Harga tidak boleh negatif." }),
   stock: z.coerce.number().min(0, { message: "Stok tidak boleh negatif." }),
@@ -30,6 +33,7 @@ type MaterialFormData = z.infer<typeof materialSchema>
 
 const EMPTY_FORM_DATA: MaterialFormData = {
   name: '',
+  type: 'Stock',
   unit: '',
   pricePerUnit: 0,
   stock: 0,
@@ -38,7 +42,7 @@ const EMPTY_FORM_DATA: MaterialFormData = {
 };
 
 export const MaterialManagement = () => {
-  const { materials, isLoading, upsertMaterial } = useMaterials()
+  const { materials, isLoading, upsertMaterial, deleteMaterial } = useMaterials()
   const { user } = useAuth()
   const { toast } = useToast()
   const [isAddStockOpen, setIsAddStockOpen] = useState(false)
@@ -46,7 +50,7 @@ export const MaterialManagement = () => {
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null)
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<MaterialFormData>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<MaterialFormData>({
     resolver: zodResolver(materialSchema),
     defaultValues: EMPTY_FORM_DATA,
   })
@@ -71,6 +75,26 @@ export const MaterialManagement = () => {
     setEditingMaterial(null);
     reset(EMPTY_FORM_DATA);
   };
+
+  const handleDeleteClick = (material: Material) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus bahan "${material.name}"?`)) {
+      deleteMaterial.mutate(material.id, {
+        onSuccess: () => {
+          toast({
+            title: "Sukses!",
+            description: `Bahan "${material.name}" berhasil dihapus.`,
+          })
+        },
+        onError: (error) => {
+          toast({
+            variant: "destructive",
+            title: "Gagal!",
+            description: `Terjadi kesalahan: ${error.message}`,
+          })
+        },
+      })
+    }
+  }
 
   const onFormSubmit = (data: MaterialFormData) => {
     const materialToSave: Partial<Material> = {
@@ -125,6 +149,25 @@ export const MaterialManagement = () => {
                 {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
               </div>
               <div className="space-y-2">
+                <Label htmlFor="type">Jenis Bahan</Label>
+                <Controller
+                  name="type"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih jenis bahan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Stock">Stock</SelectItem>
+                        <SelectItem value="Beli">Beli</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.type && <p className="text-sm text-destructive">{errors.type.message}</p>}
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="unit">Satuan</Label>
                 <Input id="unit" {...register("unit")} placeholder="meter, lembar, kg" />
                 {errors.unit && <p className="text-sm text-destructive">{errors.unit.message}</p>}
@@ -173,6 +216,7 @@ export const MaterialManagement = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Nama</TableHead>
+                <TableHead>Jenis</TableHead>
                 <TableHead>Stok Saat Ini</TableHead>
                 <TableHead>Stok Minimal</TableHead>
                 <TableHead>Harga/Satuan</TableHead>
@@ -181,10 +225,18 @@ export const MaterialManagement = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={5} className="text-center">Memuat data...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center">Memuat data...</TableCell></TableRow>
               ) : materials?.map((material) => (
                 <TableRow key={material.id}>
                   <TableCell className="font-medium">{material.name}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={
+                      material.type === 'Stock' ? 'bg-purple-100 text-purple-800' :
+                      'bg-orange-100 text-orange-800'
+                    }>
+                      {material.type}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={material.stock < material.minStock ? "destructive" : "secondary"}>
                       {material.stock} {material.unit}
@@ -203,6 +255,16 @@ export const MaterialManagement = () => {
                       <Button variant="secondary" size="sm" onClick={() => handleOpenRequestPo(material)}>
                         Request PO
                       </Button>
+                      {user?.role === 'owner' && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          onClick={() => handleDeleteClick(material)}
+                          disabled={deleteMaterial.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

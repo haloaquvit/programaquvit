@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client'
 const fromDbToApp = (dbMaterial: any): Material => ({
   id: dbMaterial.id,
   name: dbMaterial.name,
+  type: dbMaterial.type || 'Stock', // Default to Stock if not set
   unit: dbMaterial.unit,
   pricePerUnit: dbMaterial.price_per_unit,
   stock: dbMaterial.stock,
@@ -15,13 +16,16 @@ const fromDbToApp = (dbMaterial: any): Material => ({
 });
 
 const fromAppToDb = (appMaterial: Partial<Omit<Material, 'id' | 'createdAt' | 'updatedAt'>>) => {
-  const { pricePerUnit, minStock, ...rest } = appMaterial;
+  const { pricePerUnit, minStock, type, ...rest } = appMaterial;
   const dbData: any = { ...rest };
   if (pricePerUnit !== undefined) {
     dbData.price_per_unit = pricePerUnit;
   }
   if (minStock !== undefined) {
     dbData.min_stock = minStock;
+  }
+  if (type !== undefined) {
+    dbData.type = type;
   }
   return dbData;
 };
@@ -70,10 +74,24 @@ export const useMaterials = () => {
     },
   });
 
+  const deleteMaterial = useMutation({
+    mutationFn: async (materialId: string): Promise<void> => {
+      const { error } = await supabase
+        .from('materials')
+        .delete()
+        .eq('id', materialId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
+    },
+  });
+
   return {
     materials,
     isLoading,
     addStock,
     upsertMaterial,
+    deleteMaterial,
   }
 }

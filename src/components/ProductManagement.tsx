@@ -32,8 +32,11 @@ interface ProductManagementProps {
 const EMPTY_FORM_DATA: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
   name: '',
   category: 'indoor',
+  type: 'Stock',
   basePrice: 0,
   unit: 'pcs',
+  currentStock: 0,
+  minStock: 0,
   minOrder: 1,
   description: '',
   specifications: [],
@@ -47,15 +50,19 @@ export const ProductManagement = ({ materials = [] }: ProductManagementProps) =>
   const [formData, setFormData] = useState(EMPTY_FORM_DATA)
   const { user } = useAuth()
 
-  const canManageProducts = user && ['admin', 'owner', 'supervisor', 'cashier'].includes(user.role)
+  const canManageProducts = user && ['admin', 'owner', 'supervisor', 'cashier', 'designer'].includes(user.role)
+  const canDeleteProducts = user && ['admin', 'owner'].includes(user.role)
 
   const handleEditClick = (product: Product) => {
     setEditingProduct(product)
     setFormData({
       name: product.name,
       category: product.category,
+      type: product.type || 'Stock',
       basePrice: product.basePrice,
       unit: product.unit || 'pcs',
+      currentStock: product.currentStock || 0,
+      minStock: product.minStock || 0,
       minOrder: product.minOrder,
       description: product.description || '',
       specifications: product.specifications || [],
@@ -122,9 +129,15 @@ export const ProductManagement = ({ materials = [] }: ProductManagementProps) =>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2"><Label htmlFor="name">Nama Produk</Label><Input id="name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required /></div>
             <div className="space-y-2"><Label htmlFor="category">Kategori</Label><Select value={formData.category} onValueChange={(v: 'indoor' | 'outdoor') => setFormData({...formData, category: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="indoor">Indoor</SelectItem><SelectItem value="outdoor">Outdoor</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2"><Label htmlFor="type">Jenis Barang</Label><Select value={formData.type} onValueChange={(v: 'Stock' | 'Beli') => setFormData({...formData, type: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Stock">Stock (Produksi menurunkan stock)</SelectItem><SelectItem value="Beli">Beli (Produksi menambah stock)</SelectItem></SelectContent></Select></div>
             <div className="space-y-2"><Label htmlFor="basePrice">Harga Dasar (Rp)</Label><Input id="basePrice" type="number" value={formData.basePrice} onChange={(e) => setFormData({...formData, basePrice: Number(e.target.value)})} required /></div>
             <div className="space-y-2"><Label htmlFor="unit">Satuan</Label><Input id="unit" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} placeholder="pcs, lembar, m²" required /></div>
             <div className="space-y-2"><Label htmlFor="minOrder">Min. Order</Label><Input id="minOrder" type="number" value={formData.minOrder} onChange={(e) => setFormData({...formData, minOrder: Number(e.target.value)})} required /></div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2"><Label htmlFor="currentStock">Stock Saat Ini</Label><Input id="currentStock" type="number" value={formData.currentStock} onChange={(e) => setFormData({...formData, currentStock: Number(e.target.value)})} min="0" /></div>
+            <div className="space-y-2"><Label htmlFor="minStock">Stock Minimum</Label><Input id="minStock" type="number" value={formData.minStock} onChange={(e) => setFormData({...formData, minStock: Number(e.target.value)})} min="0" /></div>
           </div>
           <div className="space-y-2"><Label htmlFor="description">Deskripsi</Label><Textarea id="description" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} /></div>
 
@@ -178,25 +191,47 @@ export const ProductManagement = ({ materials = [] }: ProductManagementProps) =>
         <h2 className="text-xl font-bold mb-4">Daftar Produk</h2>
         <div className="border rounded-lg">
           <Table>
-            <TableHeader><TableRow><TableHead>Nama</TableHead><TableHead>Kategori</TableHead><TableHead>Harga Dasar</TableHead><TableHead>Satuan</TableHead>{canManageProducts && <TableHead>Aksi</TableHead>}</TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Nama</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Harga Dasar</TableHead><TableHead>Stock</TableHead><TableHead>Satuan</TableHead>{canManageProducts && <TableHead>Aksi</TableHead>}</TableRow></TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}><TableCell colSpan={canManageProducts ? 5 : 4}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                  <TableRow key={i}><TableCell colSpan={canManageProducts ? 7 : 6}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                 ))
               ) : products?.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>{product.name}</TableCell>
-                  <TableCell>{product.category}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded-full text-xs ${product.category === 'indoor' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                      {product.category}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      product.type === 'Stock' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800'
+                    }`}>
+                      {product.type || 'Stock'}
+                    </span>
+                  </TableCell>
                   <TableCell>Rp{product.basePrice.toLocaleString()}</TableCell>
+                  <TableCell>
+                    <span className={`font-medium ${
+                      (product.currentStock || 0) <= (product.minStock || 0) ? 'text-red-600' : 'text-green-600'
+                    }`}>
+                      {product.currentStock || 0}
+                      {(product.currentStock || 0) <= (product.minStock || 0) && (
+                        <span className="text-xs text-red-500 ml-1">(Min: {product.minStock || 0})</span>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell>{product.unit}</TableCell>
                   {canManageProducts && (
                     <TableCell>
                       <Button variant="ghost" size="sm" onClick={() => handleEditClick(product)}>Edit</Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-red-500">Hapus</Button>
-                        </AlertDialogTrigger>
+                      {canDeleteProducts && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-red-500">Hapus</Button>
+                          </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Anda yakin ingin menghapus produk ini?</AlertDialogTitle>
@@ -211,7 +246,8 @@ export const ProductManagement = ({ materials = [] }: ProductManagementProps) =>
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
-                      </AlertDialog>
+                        </AlertDialog>
+                      )}
                     </TableCell>
                   )}
                 </TableRow>

@@ -27,9 +27,13 @@ export interface Transaction {
   orderDate: Date;
   finishDate?: Date | null;
   items: TransactionItem[];
-  total: number;
-  paidAmount: number; // BARU: Jumlah yang sudah dibayar
-  paymentStatus: PaymentStatus; // BARU: Status pembayaran
+  subtotal: number; // Total sebelum PPN
+  ppnEnabled: boolean; // Apakah PPN diaktifkan
+  ppnPercentage: number; // Persentase PPN (default 11)
+  ppnAmount: number; // Jumlah PPN dalam rupiah
+  total: number; // Total setelah PPN
+  paidAmount: number; // Jumlah yang sudah dibayar
+  paymentStatus: PaymentStatus; // Status pembayaran
   status: TransactionStatus;
   createdAt: Date;
 }

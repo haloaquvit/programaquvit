@@ -3,7 +3,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Home, ShoppingCart, Package, Box, DollarSign, Settings, Users, FileText, List, ChevronLeft, ChevronRight, ClipboardList, Landmark, HandCoins, ReceiptText, IdCard, Fingerprint, BookCheck } from "lucide-react";
+import { Home, ShoppingCart, Package, Box, DollarSign, Settings, Users, FileText, List, ChevronLeft, ChevronRight, ClipboardList, Landmark, HandCoins, ReceiptText, IdCard, Fingerprint, BookCheck, BarChart3, PackageOpen, Shield } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const menuItems = [
@@ -25,6 +25,8 @@ const menuItems = [
       { href: "/customers", label: "Pelanggan", icon: Users },
       { href: "/employees", label: "Karyawan", icon: IdCard },
       { href: "/purchase-orders", label: "Purchase Orders", icon: ClipboardList },
+      { href: "/stock-report", label: "Laporan Stock", icon: BarChart3 },
+      { href: "/transaction-items-report", label: "Laporan Item Keluar", icon: PackageOpen },
       { href: "/attendance/report", label: "Laporan Absensi", icon: BookCheck },
     ],
   },
@@ -42,6 +44,7 @@ const menuItems = [
     title: "Pengaturan",
     items: [
       { href: "/settings", label: "Info Perusahaan", icon: Settings },
+      { href: "/role-permissions", label: "Kelola Role & Permission", icon: Shield },
     ],
   },
 ];
