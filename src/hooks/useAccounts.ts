@@ -7,8 +7,8 @@ const fromDbToApp = (dbAccount: any): Account => ({
   id: dbAccount.id,
   name: dbAccount.name,
   type: dbAccount.type,
-  balance: dbAccount.balance,
-  initialBalance: dbAccount.initial_balance || 0,
+  balance: Number(dbAccount.balance) || 0, // Ensure balance is a number
+  initialBalance: Number(dbAccount.initial_balance) || 0, // Ensure initialBalance is a number
   isPaymentAccount: dbAccount.is_payment_account,
   createdAt: new Date(dbAccount.created_at),
 });
@@ -63,7 +63,19 @@ export const useAccounts = () => {
       const { data: currentAccount, error: fetchError } = await supabase.from('accounts').select('balance').eq('id', accountId).single();
       if (fetchError) throw fetchError;
 
-      const newBalance = currentAccount.balance + amount;
+      // Ensure both values are numbers to prevent string concatenation
+      const currentBalance = Number(currentAccount.balance) || 0;
+      const amountToAdd = Number(amount) || 0;
+      const newBalance = currentBalance + amountToAdd;
+
+      console.log(`Updating account ${accountId}:`, {
+        currentBalance,
+        amountToAdd,
+        newBalance,
+        currentBalanceType: typeof currentBalance,
+        amountType: typeof amountToAdd
+      });
+
       const { data, error: updateError } = await supabase.from('accounts').update({ balance: newBalance }).eq('id', accountId).select().single();
       if (updateError) throw updateError;
       return fromDbToApp(data);

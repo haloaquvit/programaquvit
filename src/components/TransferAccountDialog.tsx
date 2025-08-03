@@ -77,11 +77,11 @@ export function TransferAccountDialog({ open, onOpenChange }: TransferAccountDia
       setIsTransferring(true)
 
       // Validate sufficient balance
-      if (fromAccount && fromAccount.balance < data.amount) {
+      if (fromAccount && Number(fromAccount.balance) < Number(data.amount)) {
         toast({
           variant: "destructive",
           title: "Saldo Tidak Mencukupi",
-          description: `Saldo ${fromAccount.name} hanya ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(fromAccount.balance)}`
+          description: `Saldo ${fromAccount.name} hanya ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(Number(fromAccount.balance))}`
         })
         return
       }
@@ -205,7 +205,7 @@ export function TransferAccountDialog({ open, onOpenChange }: TransferAccountDia
                       <div className="flex flex-col">
                         <span>{account.name}</span>
                         <span className="text-xs text-muted-foreground">
-                          {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(account.balance)}
+                          {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(Number(account.balance))}
                         </span>
                       </div>
                     </SelectItem>
@@ -232,7 +232,7 @@ export function TransferAccountDialog({ open, onOpenChange }: TransferAccountDia
                       <div className="flex flex-col">
                         <span>{account.name}</span>
                         <span className="text-xs text-muted-foreground">
-                          {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(account.balance)}
+                          {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(Number(account.balance))}
                         </span>
                       </div>
                     </SelectItem>
@@ -260,7 +260,7 @@ export function TransferAccountDialog({ open, onOpenChange }: TransferAccountDia
             )}
             {fromAccount && amount > 0 && (
               <div className="text-xs text-muted-foreground">
-                Saldo tersisa: {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(fromAccount.balance - amount)}
+                Saldo tersisa: {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(Number(fromAccount.balance) - Number(amount))}
               </div>
             )}
           </div>
@@ -284,15 +284,15 @@ export function TransferAccountDialog({ open, onOpenChange }: TransferAccountDia
               <div className="text-xs space-y-1">
                 <div className="flex justify-between">
                   <span>Dari {fromAccount.name}:</span>
-                  <span className="text-red-600">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(fromAccount.balance)} → {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(fromAccount.balance - amount)}</span>
+                  <span className="text-red-600">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(Number(fromAccount.balance))} → {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(Number(fromAccount.balance) - Number(amount))}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Ke {toAccount.name}:</span>
-                  <span className="text-green-600">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(toAccount.balance)} → {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(toAccount.balance + amount)}</span>
+                  <span className="text-green-600">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(Number(toAccount.balance))} → {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(Number(toAccount.balance) + Number(amount))}</span>
                 </div>
                 <div className="flex justify-between font-medium pt-1 border-t">
                   <span>Jumlah Transfer:</span>
-                  <span className="text-blue-600">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(amount)}</span>
+                  <span className="text-blue-600">{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(Number(amount))}</span>
                 </div>
               </div>
             </div>
