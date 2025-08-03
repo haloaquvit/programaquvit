@@ -1,278 +1,130 @@
 "use client"
-import { useState } from 'react'
+
+import { useEffect, useState } from 'react'
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { Material } from '@/types/material'
+import { toast } from '@/components/ui/use-toast'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useUser } from '@/hooks/useUser'
 import { useMaterials } from '@/hooks/useMaterials'
-import { useAuth } from '@/hooks/useAuth'
-import { AddStockDialog } from './AddStockDialog'
-import { RequestPoDialog } from './RequestPoDialog'
-import { Badge } from './ui/badge'
-import { useToast } from './ui/use-toast'
-import { Trash2 } from 'lucide-react'
+import { usePermissions } from '@/hooks/usePermissions'
+import { Trash2, Plus, Save } from "lucide-react"
 
-const materialSchema = z.object({
-  name: z.string().min(3, { message: "Nama bahan minimal 3 karakter." }),
-  type: z.enum(['Stock', 'Beli'], { message: "Pilih jenis bahan." }),
-  unit: z.string().min(1, { message: "Satuan harus diisi (cth: meter, lembar, kg)." }),
-  pricePerUnit: z.coerce.number().min(0, { message: "Harga tidak boleh negatif." }),
-  stock: z.coerce.number().min(0, { message: "Stok tidak boleh negatif." }),
-  minStock: z.coerce.number().min(0, { message: "Stok minimal tidak boleh negatif." }),
-  description: z.string().optional(),
+const schema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, "Nama wajib diisi"),
+  unit: z.string().min(1, "Satuan wajib diisi"),
+  stock: z.coerce.number().min(0),
 })
 
-type MaterialFormData = z.infer<typeof materialSchema>
+type MaterialForm = z.infer<typeof schema>
 
-const EMPTY_FORM_DATA: MaterialFormData = {
-  name: '',
-  type: 'Stock',
-  unit: '',
-  pricePerUnit: 0,
-  stock: 0,
-  minStock: 10,
-  description: '',
-};
+export default function MaterialManagement() {
+  const { user } = useUser()
+  const { canCreateMaterials, canEditMaterials, canDeleteMaterials } = usePermissions()
+  const { materials, fetchMaterials, saveMaterial, deleteMaterial } = useMaterials()
+  const [editing, setEditing] = useState(false)
 
-export const MaterialManagement = () => {
-  const { materials, isLoading, upsertMaterial, deleteMaterial } = useMaterials()
-  const { user } = useAuth()
-  const { toast } = useToast()
-  const [isAddStockOpen, setIsAddStockOpen] = useState(false)
-  const [isRequestPoOpen, setIsRequestPoOpen] = useState(false)
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
-  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null)
-
-  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<MaterialFormData>({
-    resolver: zodResolver(materialSchema),
-    defaultValues: EMPTY_FORM_DATA,
+  const form = useForm<MaterialForm>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: "", unit: "", stock: 0 }
   })
 
-  const handleOpenAddStock = (material: Material) => {
-    setSelectedMaterial(material)
-    setIsAddStockOpen(true)
+  useEffect(() => {
+    fetchMaterials()
+  }, [])
+
+  const handleSave = async (data: MaterialForm) => {
+    if (!canEditMaterials) {
+      toast({ title: "Akses ditolak", description: "Anda tidak memiliki izin untuk menyimpan bahan", variant: "destructive" })
+      return
+    }
+    await saveMaterial(data)
+    toast({ title: "Berhasil", description: "Data bahan disimpan" })
+    setEditing(false)
+    fetchMaterials()
+    form.reset({ name: "", unit: "", stock: 0 })
   }
 
-  const handleOpenRequestPo = (material: Material) => {
-    setSelectedMaterial(material)
-    setIsRequestPoOpen(true)
+  const handleEdit = (material: any) => {
+    if (!canEditMaterials) return
+    form.reset(material)
+    setEditing(true)
   }
 
-  const handleEditClick = (material: Material) => {
-    setEditingMaterial(material);
-    reset(material);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingMaterial(null);
-    reset(EMPTY_FORM_DATA);
-  };
-
-  const handleDeleteClick = (material: Material) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus bahan "${material.name}"?`)) {
-      deleteMaterial.mutate(material.id, {
-        onSuccess: () => {
-          toast({
-            title: "Sukses!",
-            description: `Bahan "${material.name}" berhasil dihapus.`,
-          })
-        },
-        onError: (error) => {
-          toast({
-            variant: "destructive",
-            title: "Gagal!",
-            description: `Terjadi kesalahan: ${error.message}`,
-          })
-        },
-      })
+  const handleDelete = async (id: string) => {
+    if (!canDeleteMaterials) {
+      toast({ title: "Akses ditolak", description: "Anda tidak memiliki izin untuk menghapus bahan", variant: "destructive" })
+      return
+    }
+    if (confirm("Yakin ingin menghapus bahan ini?")) {
+      await deleteMaterial(id)
+      toast({ title: "Dihapus", description: "Data bahan berhasil dihapus" })
+      fetchMaterials()
     }
   }
 
-  const onFormSubmit = (data: MaterialFormData) => {
-    const materialToSave: Partial<Material> = {
-      ...data,
-      id: editingMaterial?.id, // Include ID if editing
-    };
-
-    upsertMaterial.mutate(materialToSave, {
-      onSuccess: (savedMaterial) => {
-        toast({
-          title: "Sukses!",
-          description: `Bahan "${savedMaterial.name}" berhasil ${editingMaterial ? 'diperbarui' : 'ditambahkan'}.`,
-        })
-        handleCancelEdit();
-      },
-      onError: (error) => {
-        toast({
-          variant: "destructive",
-          title: "Gagal!",
-          description: `Terjadi kesalahan: ${error.message}`,
-        })
-      },
-    })
-  }
-
   return (
-    <div className="space-y-6">
-      <AddStockDialog 
-        open={isAddStockOpen}
-        onOpenChange={setIsAddStockOpen}
-        material={selectedMaterial}
-      />
-      <RequestPoDialog
-        open={isRequestPoOpen}
-        onOpenChange={setIsRequestPoOpen}
-        material={selectedMaterial}
-      />
+    <div className="p-4 space-y-6">
+      <h1 className="text-2xl font-semibold">Manajemen Bahan</h1>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{editingMaterial ? `Edit Bahan: ${editingMaterial.name}` : 'Tambah Bahan Baru'}</CardTitle>
-          <CardDescription>
-            {editingMaterial ? 'Perbarui detail bahan di bawah ini.' : 'Tambahkan material baru yang akan digunakan dalam produksi.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="name">Nama Bahan</Label>
-                <Input id="name" {...register("name")} />
-                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+      {canCreateMaterials && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{editing ? "Edit Bahan" : "Tambah Bahan Baru"}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={form.handleSubmit(handleSave)} className="grid gap-4">
+              <div>
+                <Label>Nama Bahan</Label>
+                <Input {...form.register("name")} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="type">Jenis Bahan</Label>
-                <Controller
-                  name="type"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih jenis bahan" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Stock">Stock</SelectItem>
-                        <SelectItem value="Beli">Beli</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.type && <p className="text-sm text-destructive">{errors.type.message}</p>}
+              <div>
+                <Label>Satuan</Label>
+                <Input {...form.register("unit")} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="unit">Satuan</Label>
-                <Input id="unit" {...register("unit")} placeholder="meter, lembar, kg" />
-                {errors.unit && <p className="text-sm text-destructive">{errors.unit.message}</p>}
+              <div>
+                <Label>Stok</Label>
+                <Input type="number" {...form.register("stock")} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="pricePerUnit">Harga per Satuan</Label>
-                <Input id="pricePerUnit" type="number" step="any" {...register("pricePerUnit")} />
-                {errors.pricePerUnit && <p className="text-sm text-destructive">{errors.pricePerUnit.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="stock">Stok Saat Ini</Label>
-                <Input id="stock" type="number" step="any" {...register("stock")} />
-                {errors.stock && <p className="text-sm text-destructive">{errors.stock.message}</p>}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="minStock">Stok Minimal</Label>
-                <Input id="minStock" type="number" step="any" {...register("minStock")} />
-                {errors.minStock && <p className="text-sm text-destructive">{errors.minStock.message}</p>}
-              </div>
-              <div className="space-y-2 lg:col-span-4">
-                <Label htmlFor="description">Deskripsi (Opsional)</Label>
-                <Textarea id="description" {...register("description")} />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" disabled={upsertMaterial.isPending}>
-                {upsertMaterial.isPending ? "Menyimpan..." : (editingMaterial ? 'Simpan Perubahan' : 'Simpan Bahan Baru')}
-              </Button>
-              {editingMaterial && (
-                <Button type="button" variant="outline" onClick={handleCancelEdit}>Batal</Button>
-              )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              <Button type="submit"><Save className="w-4 h-4 mr-2" /> Simpan</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Bahan & Stok</CardTitle>
-          <CardDescription>Kelola semua bahan baku dan stok yang tersedia.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nama</TableHead>
-                <TableHead>Jenis</TableHead>
-                <TableHead>Stok Saat Ini</TableHead>
-                <TableHead>Stok Minimal</TableHead>
-                <TableHead>Harga/Satuan</TableHead>
-                <TableHead>Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center">Memuat data...</TableCell></TableRow>
-              ) : materials?.map((material) => (
-                <TableRow key={material.id}>
-                  <TableCell className="font-medium">{material.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={
-                      material.type === 'Stock' ? 'bg-purple-100 text-purple-800' :
-                      'bg-orange-100 text-orange-800'
-                    }>
-                      {material.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={material.stock < material.minStock ? "destructive" : "secondary"}>
-                      {material.stock} {material.unit}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{material.minStock} {material.unit}</TableCell>
-                  <TableCell>Rp{material.pricePerUnit.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditClick(material)}>Edit</Button>
-                      {user?.role === 'admin' && (
-                        <Button variant="outline" size="sm" onClick={() => handleOpenAddStock(material)}>
-                          + Stok
-                        </Button>
-                      )}
-                      <Button variant="secondary" size="sm" onClick={() => handleOpenRequestPo(material)}>
-                        Request PO
-                      </Button>
-                      {user?.role === 'owner' && (
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          onClick={() => handleDeleteClick(material)}
-                          disabled={deleteMaterial.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {materials.map((material) => (
+          <Card key={material.id}>
+            <CardHeader>
+              <CardTitle>{material.name}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p>Satuan: {material.unit}</p>
+              <p>Stok: {material.stock}</p>
+              <div className="flex gap-2 mt-4">
+                {canEditMaterials && (
+                  <Button size="sm" onClick={() => handleEdit(material)}>Edit</Button>
+                )}
+                {canDeleteMaterials && (
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(material.id)}>
+                    <Trash2 className="w-4 h-4 mr-1" /> Hapus
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {!canEditMaterials && !canCreateMaterials && (
+        <p className="text-sm text-muted-foreground italic">Anda tidak memiliki akses untuk membuat atau mengedit bahan.</p>
+      )}
     </div>
   )
 }
