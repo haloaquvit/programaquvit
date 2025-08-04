@@ -18,10 +18,10 @@ const fromDb = (dbTransaction: any): Transaction => ({
   orderDate: new Date(dbTransaction.order_date),
   finishDate: dbTransaction.finish_date ? new Date(dbTransaction.finish_date) : null,
   items: dbTransaction.items || [],
-  subtotal: dbTransaction.subtotal || dbTransaction.total || 0, // Fallback untuk data lama
-  ppnEnabled: dbTransaction.ppn_enabled || false,
-  ppnPercentage: dbTransaction.ppn_percentage || 11,
-  ppnAmount: dbTransaction.ppn_amount || 0,
+  subtotal: dbTransaction.subtotal ?? dbTransaction.total ?? 0, // Fallback untuk data lama
+  ppnEnabled: dbTransaction.ppn_enabled ?? false,
+  ppnPercentage: dbTransaction.ppn_percentage ?? 11,
+  ppnAmount: dbTransaction.ppn_amount ?? 0,
   total: dbTransaction.total,
   paidAmount: dbTransaction.paid_amount,
   paymentStatus: dbTransaction.payment_status,
@@ -30,27 +30,34 @@ const fromDb = (dbTransaction: any): Transaction => ({
 });
 
 // Helper to map from App (camelCase) to DB (snake_case)
-const toDb = (appTransaction: Partial<Omit<Transaction, 'createdAt'>>) => ({
-  id: appTransaction.id,
-  customer_id: appTransaction.customerId,
-  customer_name: appTransaction.customerName,
-  cashier_id: appTransaction.cashierId,
-  cashier_name: appTransaction.cashierName,
-  designer_id: appTransaction.designerId || null,
-  operator_id: appTransaction.operatorId || null,
-  payment_account_id: appTransaction.paymentAccountId || null,
-  order_date: appTransaction.orderDate,
-  finish_date: appTransaction.finishDate || null,
-  items: appTransaction.items,
-  subtotal: appTransaction.subtotal,
-  ppn_enabled: appTransaction.ppnEnabled,
-  ppn_percentage: appTransaction.ppnPercentage,
-  ppn_amount: appTransaction.ppnAmount,
-  total: appTransaction.total,
-  paid_amount: appTransaction.paidAmount,
-  payment_status: appTransaction.paymentStatus,
-  status: appTransaction.status,
-});
+const toDb = (appTransaction: Partial<Omit<Transaction, 'createdAt'>>) => {
+  // Base object with required fields
+  const baseObj: any = {
+    id: appTransaction.id,
+    customer_id: appTransaction.customerId,
+    customer_name: appTransaction.customerName,
+    cashier_id: appTransaction.cashierId,
+    cashier_name: appTransaction.cashierName,
+    designer_id: appTransaction.designerId || null,
+    operator_id: appTransaction.operatorId || null,
+    payment_account_id: appTransaction.paymentAccountId || null,
+    order_date: appTransaction.orderDate,
+    finish_date: appTransaction.finishDate || null,
+    items: appTransaction.items,
+    total: appTransaction.total,
+    paid_amount: appTransaction.paidAmount,
+    payment_status: appTransaction.paymentStatus,
+    status: appTransaction.status,
+  };
+
+  // Only add PPN fields if they exist (for backward compatibility)
+  if (appTransaction.subtotal !== undefined) baseObj.subtotal = appTransaction.subtotal;
+  if (appTransaction.ppnEnabled !== undefined) baseObj.ppn_enabled = appTransaction.ppnEnabled;
+  if (appTransaction.ppnPercentage !== undefined) baseObj.ppn_percentage = appTransaction.ppnPercentage;
+  if (appTransaction.ppnAmount !== undefined) baseObj.ppn_amount = appTransaction.ppnAmount;
+
+  return baseObj;
+};
 
 export const useTransactions = () => {
   const queryClient = useQueryClient()
