@@ -53,7 +53,17 @@ const ReceiptTemplate = ({ transaction, companyInfo }: { transaction: Transactio
         </tbody>
       </table>
       <div className="mt-2 pt-1 border-t border-dashed border-black text-xs space-y-1">
-        <div className="flex justify-between font-semibold">
+        <div className="flex justify-between">
+          <span>Subtotal:</span>
+          <span>{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.subtotal)}</span>
+        </div>
+        {transaction.ppnEnabled && (
+          <div className="flex justify-between">
+            <span>PPN ({transaction.ppnPercentage}%):</span>
+            <span>{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.ppnAmount)}</span>
+          </div>
+        )}
+        <div className="flex justify-between font-semibold border-t border-dashed border-black pt-1">
           <span>Total:</span>
           <span>{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.total)}</span>
         </div>
@@ -101,7 +111,10 @@ const InvoiceTemplate = ({ transaction, companyInfo }: { transaction: Transactio
       </Table>
       <div className="flex justify-end mt-8">
         <div className="w-full max-w-xs text-gray-700 space-y-2">
-          <div className="flex justify-between"><span>Subtotal:</span><span>{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.total)}</span></div>
+          <div className="flex justify-between"><span>Subtotal:</span><span>{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.subtotal)}</span></div>
+          {transaction.ppnEnabled && (
+            <div className="flex justify-between"><span>PPN ({transaction.ppnPercentage}%):</span><span>{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.ppnAmount)}</span></div>
+          )}
           <div className="flex justify-between font-bold text-lg border-t-2 border-gray-200 pt-2 text-gray-900"><span>TOTAL:</span><span>{new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.total)}</span></div>
         </div>
       </div>
@@ -144,7 +157,25 @@ export function PrintReceiptDialog({ open, onOpenChange, transaction, template }
       didDrawPage: (data) => { doc.setFontSize(8).setTextColor(150).text(`Halaman ${data.pageNumber}`, pageWidth / 2, pageHeight - 10, { align: 'center' }); }
     });
     const finalY = (doc as any).lastAutoTable.finalY;
-    doc.setFontSize(12).setFont("helvetica", "bold").text("TOTAL:", 140, finalY + 17).text(new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.total), pageWidth - margin, finalY + 17, { align: 'right' });
+    let summaryY = finalY + 10;
+    
+    // Subtotal
+    doc.setFontSize(10).setFont("helvetica", "normal").text("Subtotal:", 140, summaryY);
+    doc.text(new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.subtotal), pageWidth - margin, summaryY, { align: 'right' });
+    summaryY += 5;
+    
+    // PPN if enabled
+    if (transaction.ppnEnabled) {
+      doc.text(`PPN (${transaction.ppnPercentage}%):`, 140, summaryY);
+      doc.text(new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.ppnAmount), pageWidth - margin, summaryY, { align: 'right' });
+      summaryY += 5;
+    }
+    
+    // Total
+    doc.setDrawColor(200).line(140, summaryY, pageWidth - margin, summaryY);
+    summaryY += 7;
+    doc.setFontSize(12).setFont("helvetica", "bold").text("TOTAL:", 140, summaryY);
+    doc.text(new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(transaction.total), pageWidth - margin, summaryY, { align: 'right' });
     
     const filename = `MDIInvoice-${transaction.id}-${format(new Date(), 'yyyyMMdd-HHmmss')}.pdf`;
     doc.save(filename);

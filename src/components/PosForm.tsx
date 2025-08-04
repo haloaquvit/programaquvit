@@ -332,6 +332,48 @@ export const PosForm = () => {
           )}
         </div>
 
+        {/* PPN Configuration */}
+        <div className="border rounded-lg p-4 bg-muted/20">
+          <h4 className="font-medium mb-3">Pengaturan Pajak</h4>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="ppn-toggle"
+                checked={ppnEnabled}
+                onCheckedChange={setPpnEnabled}
+              />
+              <Label htmlFor="ppn-toggle" className="text-sm font-medium">
+                Kena PPN
+              </Label>
+            </div>
+            {ppnEnabled && (
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="ppn-percentage" className="text-sm text-muted-foreground">
+                  Persentase PPN:
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="ppn-percentage"
+                    type="number"
+                    value={ppnPercentage}
+                    onChange={(e) => setPpnPercentage(Number(e.target.value))}
+                    className="w-20 text-right pr-8"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                  <Percent className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+            )}
+          </div>
+          {ppnEnabled && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              PPN {ppnPercentage}%: {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(ppnCalculation.ppnAmount)}
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-between items-end gap-4 pt-6 border-t">
           <div className="flex gap-4">
             <div className="space-y-1">
@@ -345,6 +387,9 @@ export const PosForm = () => {
           <div className="flex items-end gap-2">
             <div className="space-y-1"><Label className="text-xs text-muted-foreground">Sub Total</Label><Input value={new Intl.NumberFormat("id-ID").format(subTotal)} readOnly className="w-32 font-semibold text-right bg-muted" /></div>
             <div className="space-y-1"><Label htmlFor="diskon" className="text-xs text-muted-foreground">Diskon</Label><Input id="diskon" type="number" value={diskon} onChange={e => setDiskon(Number(e.target.value))} className="w-32 text-right" placeholder="Misal: 50000"/></div>
+            {ppnEnabled && (
+              <div className="space-y-1"><Label className="text-xs text-muted-foreground">PPN ({ppnPercentage}%)</Label><Input value={new Intl.NumberFormat("id-ID").format(ppnCalculation.ppnAmount)} readOnly className="w-32 font-semibold text-right bg-blue-50 text-blue-700" /></div>
+            )}
             <div className="space-y-1"><Label className="text-xs text-muted-foreground">Total Tagihan</Label><Input value={new Intl.NumberFormat("id-ID").format(totalTagihan)} readOnly className="w-32 font-semibold text-right bg-muted" /></div>
             <div className="space-y-1"><Label htmlFor="paidAmount" className="text-xs text-muted-foreground">Jumlah Bayar</Label><Input id="paidAmount" type="number" value={paidAmount} onChange={e => setPaidAmount(Number(e.target.value))} className="w-32 text-right font-bold" /></div>
             <div className="space-y-1"><Label className="text-xs text-muted-foreground">Sisa</Label><Input value={new Intl.NumberFormat("id-ID").format(sisaTagihan)} readOnly className="w-32 font-semibold text-right bg-destructive/20 text-destructive" /></div>
