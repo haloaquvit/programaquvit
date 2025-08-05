@@ -52,6 +52,8 @@ export const ProductManagement = ({ materials = [] }: ProductManagementProps) =>
 
   const canManageProducts = user && ['admin', 'owner', 'supervisor', 'cashier', 'designer'].includes(user.role)
   const canDeleteProducts = user && ['admin', 'owner'].includes(user.role)
+  const canEditAllProducts = user && ['admin', 'owner', 'supervisor', 'cashier'].includes(user.role)
+  const isDesigner = user?.role === 'designer'
 
   const handleEditClick = (product: Product) => {
     setEditingProduct(product)
@@ -105,6 +107,30 @@ export const ProductManagement = ({ materials = [] }: ProductManagementProps) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validation: BOM required for Stock type products if user is designer
+    if (isDesigner && formData.type === 'Stock' && (!formData.materials || formData.materials.length === 0)) {
+      toast({ 
+        variant: "destructive", 
+        title: "BOM Wajib!", 
+        description: "Produk jenis 'Stock' wajib memiliki Bill of Materials (BOM). Silakan tambahkan minimal 1 bahan." 
+      })
+      return
+    }
+
+    // Validation: BOM items must have materialId and quantity > 0
+    if (formData.materials && formData.materials.length > 0) {
+      const invalidBomItems = formData.materials.some(item => !item.materialId || item.quantity <= 0)
+      if (invalidBomItems) {
+        toast({ 
+          variant: "destructive", 
+          title: "BOM Tidak Valid!", 
+          description: "Semua item BOM harus memiliki bahan dan jumlah yang valid." 
+        })
+        return
+      }
+    }
+    
     const productData: Partial<Product> = {
       ...formData,
       id: editingProduct?.id,
@@ -154,7 +180,12 @@ export const ProductManagement = ({ materials = [] }: ProductManagementProps) =>
           </div>
 
           <div className="space-y-4 pt-4 border-t">
-            <h3 className="font-semibold">Bill of Materials (BOM)</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Bill of Materials (BOM)</h3>
+              {isDesigner && formData.type === 'Stock' && (
+                <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Wajib diisi untuk produk Stock</span>
+              )}
+            </div>
             <div className="border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader><TableRow><TableHead>Bahan/Material</TableHead><TableHead>Kebutuhan</TableHead><TableHead>Catatan</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
@@ -189,6 +220,14 @@ export const ProductManagement = ({ materials = [] }: ProductManagementProps) =>
 
       <div className="mt-8">
         <h2 className="text-xl font-bold mb-4">Daftar Produk</h2>
+        {isDesigner && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Info Designer:</strong> Anda dapat membuat produk baru dan melihat semua produk. 
+              Untuk produk jenis "Stock", wajib mengisi Bill of Materials (BOM).
+            </p>
+          </div>
+        )}
         <div className="border rounded-lg">
           <Table>
             <TableHeader><TableRow><TableHead>Nama</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Harga Dasar</TableHead><TableHead>Stock</TableHead><TableHead>Satuan</TableHead>{canManageProducts && <TableHead>Aksi</TableHead>}</TableRow></TableHeader>
@@ -226,7 +265,12 @@ export const ProductManagement = ({ materials = [] }: ProductManagementProps) =>
                   <TableCell>{product.unit}</TableCell>
                   {canManageProducts && (
                     <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => handleEditClick(product)}>Edit</Button>
+                      {canEditAllProducts && (
+                        <Button variant="ghost" size="sm" onClick={() => handleEditClick(product)}>Edit</Button>
+                      )}
+                      {isDesigner && (
+                        <Button variant="ghost" size="sm" disabled className="text-gray-400">View Only</Button>
+                      )}
                       {canDeleteProducts && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

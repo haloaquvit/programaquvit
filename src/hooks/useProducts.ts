@@ -74,9 +74,8 @@ export const useProducts = () => {
         logDebug('Product Update Success', data);
         return fromDb(data);
       } else {
-        // Insert new product
-        const newId = `prod-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-        const insertData = { ...dbData, id: newId };
+        // Insert new product - let database generate UUID automatically
+        const insertData = { ...dbData };
         
         logDebug('Product Insert', { insertData });
         

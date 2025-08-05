@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
       const employeeProfile: Employee = {
         id: data.id,
         name: data.full_name,
-        username: data.username,
+        username: data.username || data.full_name || data.email || '',
         email: data.email,
         role: data.role,
         phone: data.phone,

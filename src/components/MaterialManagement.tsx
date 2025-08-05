@@ -45,6 +45,10 @@ export const MaterialManagement = () => {
   const { materials, isLoading, upsertMaterial, deleteMaterial } = useMaterials()
   const { user } = useAuth()
   const { toast } = useToast()
+
+  // Permission checks
+  const canManageMaterials = user && ['admin', 'owner', 'supervisor'].includes(user.role)
+  const canManageStock = user && ['admin', 'owner'].includes(user.role)
   const [isAddStockOpen, setIsAddStockOpen] = useState(false)
   const [isRequestPoOpen, setIsRequestPoOpen] = useState(false)
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
@@ -133,14 +137,15 @@ export const MaterialManagement = () => {
         material={selectedMaterial}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{editingMaterial ? `Edit Bahan: ${editingMaterial.name}` : 'Tambah Bahan Baru'}</CardTitle>
-          <CardDescription>
-            {editingMaterial ? 'Perbarui detail bahan di bawah ini.' : 'Tambahkan material baru yang akan digunakan dalam produksi.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      {canManageMaterials && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{editingMaterial ? `Edit Bahan: ${editingMaterial.name}` : 'Tambah Bahan Baru'}</CardTitle>
+            <CardDescription>
+              {editingMaterial ? 'Perbarui detail bahan di bawah ini.' : 'Tambahkan material baru yang akan digunakan dalam produksi.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
           <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="space-y-2 lg:col-span-2">
@@ -204,12 +209,19 @@ export const MaterialManagement = () => {
             </div>
           </form>
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
           <CardTitle>Daftar Bahan & Stok</CardTitle>
-          <CardDescription>Kelola semua bahan baku dan stok yang tersedia.</CardDescription>
+          <CardDescription>
+            {canManageMaterials 
+              ? 'Kelola semua bahan baku dan stok yang tersedia.'
+              : user?.role === 'designer' 
+                ? 'Lihat informasi bahan baku dan request Purchase Order (PO).'
+                : 'Lihat informasi bahan baku dan stok (hanya baca).'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -246,8 +258,10 @@ export const MaterialManagement = () => {
                   <TableCell>Rp{material.pricePerUnit.toLocaleString()}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditClick(material)}>Edit</Button>
-                      {user?.role === 'admin' && (
+                      {canManageMaterials && (
+                        <Button variant="outline" size="sm" onClick={() => handleEditClick(material)}>Edit</Button>
+                      )}
+                      {canManageStock && (
                         <Button variant="outline" size="sm" onClick={() => handleOpenAddStock(material)}>
                           + Stok
                         </Button>
